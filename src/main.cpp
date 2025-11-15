@@ -1,36 +1,30 @@
-// -------------------------------------------------------------------------
-// src/main.cpp
-// Điểm khởi đầu CỰC KỲ GỌN GÀNG
-// -------------------------------------------------------------------------
-
-#include "GameEngine.h" // Chỉ cần biết về GameEngine
+#include "GameEngine.h"
 #include <iostream>
+#include <windows.h>
 
-int main(int argc, char* args[]) {
-    
-    std::cout << "Starting 'Ky Mon Than Toc'..." << std::endl;
+int main(int argc, char* argv[]) {
 
-    // 1. Tạo đối tượng GameEngine
+    SetConsoleOutputCP(CP_UTF8); // Thiết lập mã hóa UTF-8 cho console
+    SetConsoleCP(CP_UTF8); // Thiết lập mã hóa UTF-8 cho console
+
     GameEngine* game = new GameEngine();
+    
+    // Khởi tạo cửa sổ 1280 x 720
+    if (game->Init("Kỳ Môn Thần Tốc", 100, 100, 1280, 720, false)) { 
 
-    // 2. Khởi tạo
-    // (Chúng ta sẽ dùng 1024x768, không full screen)
-    if (game->Init("Ky Mon Than Toc - PBL2", 
-                   SDL_WINDOWPOS_CENTERED, // Căn giữa cửa sổ
-                   SDL_WINDOWPOS_CENTERED, 
-                   1024, 
-                   768, 
-                   false)) {
-        
-        // 3. Chạy vòng lặp game
-        game->Run();
+        // Vòng lặp chính của game
+        while (game->IsRunning()) {
+            game->HandleEvents(); // 1. Xử lý Input
+            game->Update();       // 2. Cập nhật Logic
+            game->Render();       // 3. Vẽ Đồ họa
+        }
+
     }
 
-    // 4. Dọn dẹp (khi Run() kết thúc)
-    // (Hàm Run() sẽ tự gọi CleanUp() bên trong nó)
-    delete game; // Xóa đối tượng game
-    game = NULL;
-
-    std::cout << "Exiting 'Ky Mon Than Toc'..." << std::endl;
+    // Dọn dẹp tài nguyên và kết thúc game
+    game->Quit();
+    delete game;
+    game = nullptr;
+    
     return 0;
 }
