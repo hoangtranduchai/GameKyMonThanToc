@@ -1,165 +1,146 @@
-// -------------------------------------------------------------------------
-// src/GameEngine.cpp
-// Hiện thực hóa file header GameEngine.h
-// -------------------------------------------------------------------------
+#include "GameEngine.h"
+#include <string>
 
-#include "GameEngine.h"       // Quan trọng! Phải include header tương ứng
-#include "GameStateManager.h" // Cần biết GameStateManager để tạo nó
-#include "TextureManager.h"   // Cần biết TextureManager để load texture
-#include "PlayState.h"        // Cần biết PlayState để khởi tạo trạng thái ban đầu
-#include <iostream>
-
-// ----- 1. Hàm khởi tạo (Constructor) -----
 GameEngine::GameEngine() {
-    // Đặt tất cả các con trỏ về NULL
-    // Đây là thói quen code "sạch" để tránh lỗi "con trỏ hoang"
-    m_pWindow = NULL;
-    m_pRenderer = NULL;
-    m_pGameStateManager = NULL;
-    m_bIsRunning = false;
-    std::cout << "GameEngine constructor called." << std::endl;
+    // Khởi tạo mọi con trỏ về nullptr là "chuẩn mực"
+    m_pWindow = nullptr;
+    m_pRenderer = nullptr;
+    m_pPlayerTexture = nullptr;
+    m_bRunning = false; // Game chưa chạy
 }
 
-// ----- 2. Hàm hủy (Destructor) -----
+// Hàm hủy sẽ tự động gọi Quit khi đối tượng bị xóa
 GameEngine::~GameEngine() {
-    // Hàm hủy sẽ gọi CleanUp để đảm bảo mọi thứ được dọn dẹp
-    // (Mặc dù CleanUp() thường được gọi riêng ở cuối hàm Run())
-    std::cout << "GameEngine destructor called." << std::endl;
-    // CleanUp(); // Chúng ta sẽ gọi CleanUp thủ công
+    // Chúng ta có thể để trống hoặc gọi Quit()
+    // Tốt hơn là gọi Quit() từ main.cpp để kiểm soát rõ ràng
 }
 
-// ----- 3. Hàm Khởi tạo (Init) -----
-bool GameEngine::Init(const char* title, int x, int y, int width, int height, bool fullscreen) {
-    // Đặt cờ m_bIsRunning = true
-    m_bIsRunning = true;
-
-    // --- 1. Khởi tạo SDL ---
-    // Yêu cầu khởi tạo Video, Âm thanh và Timer
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) < 0) {
-        std::cout << "SDL Init failed! ERROR: " << SDL_GetError() << std::endl;
-        m_bIsRunning = false;
+// Khởi tạo tất cả hệ thống
+bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullscreen) {
+    // Khởi tạo SDL
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
+        std::cout << "SDL không thể khởi tạo! Lỗi SDL: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    // --- 2. Tạo Cửa sổ (Window) ---
-    int windowFlags = SDL_WINDOW_SHOWN; // Cờ mặc định
+    // Khởi tạo SDL_image
+    if (!(IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG))) {
+        std::cout << "SDL_image không thể khởi tạo! Lỗi: " << IMG_GetError() << std::endl;
+        return false;
+    }
+
+    // Khởi tạo SDL_ttf
+    if (TTF_Init() == -1) {
+        std::cout << "SDL_ttf không thể khởi tạo! Lỗi: " << TTF_GetError() << std::endl;
+        return false;
+    }
+
+    // Khởi tạo SDL_mixer
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        std::cout << "SDL_mixer không thể khởi tạo! Lỗi: " << Mix_GetError() << std::endl;
+        return false;
+    }
+
+    // Tạo cửa sổ game
+    int flags = 0;
     if (fullscreen) {
-        windowFlags = SDL_WINDOW_FULLSCREEN;
+        flags = SDL_WINDOW_FULLSCREEN;
     }
-
-    m_pWindow = SDL_CreateWindow(title, x, y, width, height, windowFlags);
-    if (m_pWindow == NULL) {
-        std::cout << "Window creation failed! ERROR: " << SDL_GetError() << std::endl;
-        m_bIsRunning = false;
+    m_pWindow = SDL_CreateWindow(title, x, y, w, h, flags);
+    if (m_pWindow == nullptr) {
+        std::cout << "Không thể tạo cửa sổ! Lỗi SDL: " << SDL_GetError() << std::endl;
         return false;
     }
 
-    // --- 3. Tạo Bộ kết xuất (Renderer) ---
+    // Tạo trình kết xuất (Bộ phận render đồ họa mạnh mẽ)
     m_pRenderer = SDL_CreateRenderer(m_pWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (m_pRenderer == NULL) {
-        std::cout << "Renderer creation failed! ERROR: " << SDL_GetError() << std::endl;
-        m_bIsRunning = false;
+    if (m_pRenderer == nullptr) {
+        std::cout << "Không thể tạo trình kết xuất! Lỗi SDL: " << SDL_GetError() << std::endl;
+        SDL_DestroyWindow(m_pWindow);     // Dọn dẹp cửa sổ đã tạo
         return false;
     }
-    // Đặt màu vẽ mặc định là màu đen
+
+    // Đặt màu vẽ mặc định cho trình kết xuất (Màu đen)
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
 
-    // --- 4. Khởi tạo các thư viện phụ (Image, TTF, Mixer) ---
-    // (Phần này sẽ được thêm vào sau, nhưng Init của SDL_image là cần thiết ngay)
-    if (!(IMG_Init(IMG_INIT_PNG))) {
-        std::cout << "SDL_image Init failed! ERROR: " << IMG_GetError() << std::endl;
-        m_bIsRunning = false;
-        return false;
+    // Tải "Kết cấu" AAA đầu tiên
+    // Xây dựng đường dẫn "tuyệt đối, không tì vết" bằng Macro từ CMake
+    std::string imagePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png";
+    
+    m_pPlayerTexture = IMG_LoadTexture(m_pRenderer, imagePath.c_str());
+    if (m_pPlayerTexture == nullptr) {
+        std::cout << "Không thể tải texture tại: '" << imagePath << "'! Lỗi: " << IMG_GetError() << std::endl;
+        // Chúng ta vẫn có thể return true để chạy game dù không có hình ảnh
+        // (hoặc return false nếu hình ảnh này là "tối quan trọng")
     }
 
-    // --- 5. Khởi tạo Game State Manager ---
-    m_pGameStateManager = new GameStateManager();
-    m_pGameStateManager->Init(this); // "this" là con trỏ trỏ tới chính GameEngine này
-
-    // --- 6. Đặt Trạng thái ban đầu (PlayState) ---
-    // Đây là bước quan trọng để cỗ máy bắt đầu chạy
-    m_pGameStateManager->ChangeState(new PlayState());
-
-    std::cout << "GameEngine Init successful." << std::endl;
-    return true; // Khởi tạo thành công!
+    std::cout << "Game Engine khởi tạo thành công!" << std::endl;
+    m_bRunning = true;
+    return true;
 }
 
-// ----- 4. Hàm Chạy Vòng lặp (Run) -----
-void GameEngine::Run() {
-    const int FPS = 60; // 60 khung hình/giây
-    const int FRAME_DELAY = 1000 / FPS; // Thời gian cho mỗi khung hình (khoảng 16.6ms)
+// Dọn dẹp Tài nguyên
+void GameEngine::Quit() {
+    std::cout << "Game Engine đang dọn dẹp và kết thúc..." << std::endl;
 
-    Uint32 frameStart;
-    int frameTime;
+    // Dọn dẹp "Kết cấu" (Texture)
+    SDL_DestroyTexture(m_pPlayerTexture);
+    m_pPlayerTexture = nullptr;
 
-    std::cout << "GameEngine is now running..." << std::endl;
-    while (m_bIsRunning) {
-        frameStart = SDL_GetTicks(); // Lấy thời gian bắt đầu frame
-
-        // 1. Xử lý Input
-        HandleEvents();
-        
-        // 2. Cập nhật Logic
-        Update();
-        
-        // 3. Vẽ lên màn hình
-        Render();
-
-        frameTime = SDL_GetTicks() - frameStart; // Thời gian thực thi frame
-
-        // Giới hạn FPS
-        if (FRAME_DELAY > frameTime) {
-            SDL_Delay(FRAME_DELAY - frameTime); // Chờ cho đủ 16.6ms
-        }
-    }
-
-    // Khi vòng lặp kết thúc, dọn dẹp
-    CleanUp();
-}
-
-// ----- 5. Dọn dẹp (CleanUp) -----
-void GameEngine::CleanUp() {
-    std::cout << "Cleaning up GameEngine..." << std::endl;
-    
-    // Dọn dẹp theo thứ tự ngược lại với lúc tạo
-    m_pGameStateManager->CleanUp(); // Dọn dẹp tất cả các trạng thái
-    delete m_pGameStateManager;     // Xóa StateManager
-    m_pGameStateManager = NULL;
-
-    TextureManager::GetInstance()->Clean(); // Dọn dẹp toàn bộ texture
-
-    IMG_Quit(); // Tắt hệ thống SDL_image
-    
+    // Dọn dẹp "Cây cọ" (Renderer) và "Bức toan" (Window)
     SDL_DestroyRenderer(m_pRenderer);
     SDL_DestroyWindow(m_pWindow);
-    m_pWindow = NULL;
-    m_pRenderer = NULL;
+    m_pWindow = nullptr; // "Chuẩn mực" là đặt lại con trỏ
+    m_pRenderer = nullptr;
 
-    SDL_Quit(); // Tắt toàn bộ SDL
-    std::cout << "GameEngine cleanup complete." << std::endl;
+    // Dọn dẹp các thư viện
+    Mix_CloseAudio();
+    Mix_Quit();
+    TTF_Quit();
+    IMG_Quit();
+    SDL_Quit();
+    
+    std::cout << "Game Engine đã dọn dẹp và kết thúc!" << std::endl;
 }
 
-// ----- 6. Các hàm vòng lặp riêng -----
-// Các hàm này giờ đây sẽ "ủy quyền" (delegate)
-// công việc cho GameStateManager
-
+// Xử lý sự kiện
 void GameEngine::HandleEvents() {
-    m_pGameStateManager->HandleEvents();
+    SDL_Event event;
+    // Xử lý tất cả các sự kiện trong hàng đợi
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) {
+            m_bRunning = false;
+        }
+        // TODO: Xử lý Input chi tiết hơn (keyboard, mouse) sau
+    }
 }
 
+// Cập nhật logic Game
 void GameEngine::Update() {
-    m_pGameStateManager->Update();
+    // TODO: Triển khai logic Update của IGameState hiện tại
 }
 
+// Render Đồ họa
 void GameEngine::Render() {
-    // Xóa màn hình về màu đen
-    // (Chúng ta có thể chuyển cái này vào PlayState sau)
+    // Xóa sạch "bức toan" bằng màu đen
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(m_pRenderer);
+    
+    // ---- BẮT ĐẦU VẼ "ĐỒ HỌA AAA" ----
+    
+    // 1. Tạo một hình chữ nhật (Rect) để xác định vị trí và kích thước
+    SDL_Rect destRect;
+    destRect.x = 100; // Vị trí X (từ trái)
+    destRect.y = 100; // Vị trí Y (từ trên)
+    
+    // 2. Lấy kích thước "chuẩn mực" của Texture
+    SDL_QueryTexture(m_pPlayerTexture, NULL, NULL, &destRect.w, &destRect.h);
+    
+    // 3. Sao chép (vẽ) Texture lên Renderer
+    SDL_RenderCopy(m_pRenderer, m_pPlayerTexture, NULL, &destRect);
 
-    // Yêu cầu StateManager vẽ trạng thái hiện tại
-    m_pGameStateManager->Render();
+    // ---- KẾT THÚC VẼ ----
 
-    // Hiển thị ra màn hình
+    // Hiển thị mọi thứ đã vẽ ra màn hình
     SDL_RenderPresent(m_pRenderer);
 }
