@@ -1,12 +1,23 @@
 #include "GameEngine.h"
 #include <string>
 
+// Theo dõi thời gian "chuẩn mực"
+static Uint32 s_lastTick = 0;
+static float s_deltaTime = 0.0f;
+
 GameEngine::GameEngine() {
     // Khởi tạo mọi con trỏ về nullptr là "chuẩn mực"
     m_pWindow = nullptr;
     m_pRenderer = nullptr;
     m_pPlayerTexture = nullptr;
     m_bRunning = false; // Game chưa chạy
+
+    // Khởi tạo tốc độ và trạng thái input "chuẩn mực"
+    m_playerSpeed = 200.0f; // Ví dụ: 200 pixel/giây
+    m_movingLeft = false;
+    m_movingRight = false;
+    m_movingUp = false;
+    m_movingDown = false;
 }
 
 // Hàm hủy sẽ tự động gọi Quit khi đối tượng bị xóa
@@ -51,6 +62,9 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
         std::cout << "Không thể tạo cửa sổ! Lỗi SDL: " << SDL_GetError() << std::endl;
         return false;
     }
+    // Lưu kích thước cửa sổ để giới hạn di chuyển
+    m_windowWidth = w;
+    m_windowHeight = h;
 
     // Tạo trình kết xuất (Bộ phận render đồ họa mạnh mẽ)
     m_pRenderer = SDL_CreateRenderer(m_pWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -73,6 +87,17 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
         // Chúng ta vẫn có thể return true để chạy game dù không có hình ảnh
         // (hoặc return false nếu hình ảnh này là "tối quan trọng")
     }
+
+    // Khởi tạo vị trí và kích thước ban đầu cho nhân vật
+    m_playerDestRect.x = 100;
+    m_playerDestRect.y = 100;
+    // Lấy kích thước "sắc nét" từ texture
+    SDL_QueryTexture(m_pPlayerTexture, NULL, NULL, &m_playerDestRect.w, &m_playerDestRect.h);
+
+    // Scale (0.5 = giảm còn 50%)
+    const float playerScale = 0.5f;
+    m_playerDestRect.w = static_cast<int>(m_playerDestRect.w * playerScale);
+    m_playerDestRect.h = static_cast<int>(m_playerDestRect.h * playerScale);
 
     std::cout << "Game Engine khởi tạo thành công!" << std::endl;
     m_bRunning = true;
@@ -111,13 +136,93 @@ void GameEngine::HandleEvents() {
         if (event.type == SDL_QUIT) {
             m_bRunning = false;
         }
-        // TODO: Xử lý Input chi tiết hơn (keyboard, mouse) sau
+        
+        // LOGIC XỬ LÝ INPUT
+        if (event.type == SDL_KEYDOWN) { // Nếu một phím được nhấn
+            switch (event.key.keysym.sym) { // Kiểm tra phím đó là gì
+                case SDLK_w : case SDLK_UP: // Phím W, Phím lên
+                    m_movingUp = true; // Di chuyển lên
+                    break;
+                case SDLK_s: case SDLK_DOWN: // Phím S, Phím xuống
+                    m_movingDown = true; // Di chuyển xuống
+                    break;
+                case SDLK_a: case SDLK_LEFT: // Phím A, Phím trái
+                    m_movingLeft = true; // Di chuyển sang trái
+                    break;
+                case SDLK_d: case SDLK_RIGHT: // Phím D, Phím phải
+                    m_movingRight = true; // Di chuyển sang phải
+                    break;
+            }
+        }
+        else if (event.type == SDL_KEYUP) { // Nếu một phím được thả ra
+            switch (event.key.keysym.sym) { // Kiểm tra phím đó là gì
+                case SDLK_w : case SDLK_UP: // Phím W, Phím lên
+                    m_movingUp = false; // Ngừng di chuyển lên
+                    break;
+                case SDLK_s: case SDLK_DOWN: // Phím S, Phím xuống
+                    m_movingDown = false; // Ngừng di chuyển xuống
+                    break;
+                case SDLK_a: case SDLK_LEFT: // Phím A, Phím trái
+                    m_movingLeft = false; // Ngừng di chuyển sang trái
+                    break;
+                case SDLK_d: case SDLK_RIGHT: // Phím D, Phím phải
+                    m_movingRight = false; // Ngừng di chuyển sang phải
+                    break;
+            }
+        }
     }
 }
 
 // Cập nhật logic Game
 void GameEngine::Update() {
-    // TODO: Triển khai logic Update của IGameState hiện tại
+    // TÍNH TOÁN "TIME-STEP" CHO HIỆU SUẤT TỐI ƯU
+    Uint32 currentTick = SDL_GetTicks(); // Lấy thời gian hiện tại (miligiây)
+    s_deltaTime = (currentTick - s_lastTick) / 1000.0f; // Thời gian trôi qua (giây)
+    s_lastTick = currentTick; // Cập nhật thời gian cho khung hình tiếp theo
+
+    // Đặt giới hạn DeltaTime để tránh lỗi khi pause/debug quá lâu
+    if (s_deltaTime > 0.05f) { // Ví dụ: Giới hạn 50ms/frame (20 FPS tối thiểu)
+        s_deltaTime = 0.05f;
+    }
+
+    // LOGIC DI CHUYỂN
+    float moveX = 0;
+    float moveY = 0;
+
+    if (m_movingLeft)  moveX -= m_playerSpeed;
+    if (m_movingRight) moveX += m_playerSpeed;
+    if (m_movingUp)    moveY -= m_playerSpeed;
+    if (m_movingDown)  moveY += m_playerSpeed;
+
+    // Chuẩn hóa Vector di chuyển để tốc độ chéo không nhanh hơn (Nếu đang di chuyển chéo)
+    if (moveX != 0 && moveY != 0) {
+        // return; // Không cho di chuyển chéo
+        float length = sqrt(moveX * moveX + moveY * moveY);
+        moveX = (moveX / length) * m_playerSpeed;
+        moveY = (moveY / length) * m_playerSpeed;
+    }
+
+    // Cập nhật vị trí
+    m_playerDestRect.x += (int)(moveX * s_deltaTime);
+    m_playerDestRect.y += (int)(moveY * s_deltaTime);
+
+    // GIỚI HẠN DI CHUYỂN TRONG CỬA SỔ
+    // Giới hạn bên trái
+    if (m_playerDestRect.x < 0) {
+        m_playerDestRect.x = 0;
+    }
+    // Giới hạn bên phải
+    if (m_playerDestRect.x + m_playerDestRect.w > m_windowWidth) {
+        m_playerDestRect.x = m_windowWidth - m_playerDestRect.w;
+    }
+    // Giới hạn phía trên
+    if (m_playerDestRect.y < 0) {
+        m_playerDestRect.y = 0;
+    }
+    // Giới hạn phía dưới
+    if (m_playerDestRect.y + m_playerDestRect.h > m_windowHeight) {
+        m_playerDestRect.y = m_windowHeight - m_playerDestRect.h;
+    }
 }
 
 // Render Đồ họa
@@ -126,21 +231,10 @@ void GameEngine::Render() {
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(m_pRenderer);
     
-    // ---- BẮT ĐẦU VẼ "ĐỒ HỌA AAA" ----
+    // VẼ "KIỆT TÁC"
+    // Vẽ Texture của người chơi tại vị trí m_playerDestRect
+    SDL_RenderCopy(m_pRenderer, m_pPlayerTexture, NULL, &m_playerDestRect);
     
-    // 1. Tạo một hình chữ nhật (Rect) để xác định vị trí và kích thước
-    SDL_Rect destRect;
-    destRect.x = 100; // Vị trí X (từ trái)
-    destRect.y = 100; // Vị trí Y (từ trên)
-    
-    // 2. Lấy kích thước "chuẩn mực" của Texture
-    SDL_QueryTexture(m_pPlayerTexture, NULL, NULL, &destRect.w, &destRect.h);
-    
-    // 3. Sao chép (vẽ) Texture lên Renderer
-    SDL_RenderCopy(m_pRenderer, m_pPlayerTexture, NULL, &destRect);
-
-    // ---- KẾT THÚC VẼ ----
-
     // Hiển thị mọi thứ đã vẽ ra màn hình
     SDL_RenderPresent(m_pRenderer);
 }

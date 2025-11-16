@@ -17,7 +17,21 @@ private:
     bool m_bRunning;
     SDL_Window* m_pWindow;
     SDL_Renderer* m_pRenderer;
-    SDL_Texture* m_pPlayerTexture; // "Kết cấu" cho đồ họa đầu tiên
+    SDL_Texture* m_pPlayerTexture; // "Kết cấu" của nhân vật
+    SDL_Rect m_playerDestRect; // "Trạng thái" của nhân vật (Vị trí và Kích thước)
+
+    // "Tốc độ" của nhân vật (Pixel/giây) cho "lối chơi cân bằng"
+    float m_playerSpeed; 
+
+    // "Trạng thái" Input của người chơi (Di chuyển)
+    bool m_movingLeft;
+    bool m_movingRight;
+    bool m_movingUp;
+    bool m_movingDown;
+
+    // Kích thước cửa sổ để giới hạn di chuyển
+    int m_windowWidth;
+    int m_windowHeight;
 
 public:
     GameEngine();
