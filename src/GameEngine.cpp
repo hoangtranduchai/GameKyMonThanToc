@@ -66,7 +66,7 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     m_windowWidth = w;
     m_windowHeight = h;
 
-    // Tạo trình kết xuất (Bộ phận render đồ họa mạnh mẽ)
+    // Tạo trình kết xuất render đồ họa
     m_pRenderer = SDL_CreateRenderer(m_pWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (m_pRenderer == nullptr) {
         std::cout << "Không thể tạo trình kết xuất! Lỗi SDL: " << SDL_GetError() << std::endl;
@@ -77,8 +77,7 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Đặt màu vẽ mặc định cho trình kết xuất (Màu đen)
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
 
-    // Tải "Kết cấu" AAA đầu tiên
-    // Xây dựng đường dẫn "tuyệt đối, không tì vết" bằng Macro từ CMake
+    // Xây dựng đường dẫn tuyệt đối bằng Macro từ CMake
     std::string imagePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png";
     
     m_pPlayerTexture = IMG_LoadTexture(m_pRenderer, imagePath.c_str());
@@ -91,11 +90,11 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Khởi tạo vị trí và kích thước ban đầu cho nhân vật
     m_playerDestRect.x = 100;
     m_playerDestRect.y = 100;
-    // Lấy kích thước "sắc nét" từ texture
+    // Lấy kích thước từ texture
     SDL_QueryTexture(m_pPlayerTexture, NULL, NULL, &m_playerDestRect.w, &m_playerDestRect.h);
 
-    // Scale (0.5 = giảm còn 50%)
-    const float playerScale = 0.5f;
+    // Scale (0.2 = giảm còn 20%)
+    const float playerScale = 0.2f;
     m_playerDestRect.w = static_cast<int>(m_playerDestRect.w * playerScale);
     m_playerDestRect.h = static_cast<int>(m_playerDestRect.h * playerScale);
 
@@ -115,7 +114,7 @@ void GameEngine::Quit() {
     // Dọn dẹp "Cây cọ" (Renderer) và "Bức toan" (Window)
     SDL_DestroyRenderer(m_pRenderer);
     SDL_DestroyWindow(m_pWindow);
-    m_pWindow = nullptr; // "Chuẩn mực" là đặt lại con trỏ
+    m_pWindow = nullptr;
     m_pRenderer = nullptr;
 
     // Dọn dẹp các thư viện

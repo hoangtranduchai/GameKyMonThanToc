@@ -1,4 +1,4 @@
-#pragma once // Đảm bảo tệp header chỉ được thêm một lần
+#pragma once
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>
@@ -20,14 +20,14 @@ private:
     SDL_Texture* m_pPlayerTexture; // "Kết cấu" của nhân vật
     SDL_Rect m_playerDestRect; // "Trạng thái" của nhân vật (Vị trí và Kích thước)
 
-    // "Tốc độ" của nhân vật (Pixel/giây) cho "lối chơi cân bằng"
+    // "Tốc độ" của nhân vật (Pixel/giây)
     float m_playerSpeed; 
 
     // "Trạng thái" Input của người chơi (Di chuyển)
-    bool m_movingLeft;
-    bool m_movingRight;
     bool m_movingUp;
     bool m_movingDown;
+    bool m_movingLeft;
+    bool m_movingRight;
 
     // Kích thước cửa sổ để giới hạn di chuyển
     int m_windowWidth;
