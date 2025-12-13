@@ -52,6 +52,14 @@ build CMakeFiles/KyMonThanToc.dir/src/GameEngine.cpp.obj: CXX_COMPILER__KyMonTha
   OBJECT_DIR = CMakeFiles\KyMonThanToc.dir
   OBJECT_FILE_DIR = CMakeFiles\KyMonThanToc.dir\src
 
+build CMakeFiles/KyMonThanToc.dir/src/TextureManager.cpp.obj: CXX_COMPILER__KyMonThanToc_unscanned_ E$:/BachKhoaDaNang/PBL2/GameKyMonThanToc/src/TextureManager.cpp || cmake_object_order_depends_target_KyMonThanToc
+  DEFINES = -DPROJECT_ROOT_PATH=\"E:/BachKhoaDaNang/PBL2/GameKyMonThanToc\"
+  DEP_FILE = CMakeFiles\KyMonThanToc.dir\src\TextureManager.cpp.obj.d
+  FLAGS = -std=gnu++17
+  INCLUDES = -IE:/BachKhoaDaNang/PBL2/GameKyMonThanToc/include -isystem C:/msys64/mingw64/include/SDL2
+  OBJECT_DIR = CMakeFiles\KyMonThanToc.dir
+  OBJECT_FILE_DIR = CMakeFiles\KyMonThanToc.dir\src
+
 build CMakeFiles/KyMonThanToc.dir/src/main.cpp.obj: CXX_COMPILER__KyMonThanToc_unscanned_ E$:/BachKhoaDaNang/PBL2/GameKyMonThanToc/src/main.cpp || cmake_object_order_depends_target_KyMonThanToc
   DEFINES = -DPROJECT_ROOT_PATH=\"E:/BachKhoaDaNang/PBL2/GameKyMonThanToc\"
   DEP_FILE = CMakeFiles\KyMonThanToc.dir\src\main.cpp.obj.d
@@ -68,7 +76,7 @@ build CMakeFiles/KyMonThanToc.dir/src/main.cpp.obj: CXX_COMPILER__KyMonThanToc_u
 #############################################
 # Link the executable KyMonThanToc.exe
 
-build KyMonThanToc.exe: CXX_EXECUTABLE_LINKER__KyMonThanToc_ CMakeFiles/KyMonThanToc.dir/src/GameEngine.cpp.obj CMakeFiles/KyMonThanToc.dir/src/main.cpp.obj | C$:/msys64/mingw64/lib/libSDL2main.a C$:/msys64/mingw64/lib/libSDL2.dll.a
+build KyMonThanToc.exe: CXX_EXECUTABLE_LINKER__KyMonThanToc_ CMakeFiles/KyMonThanToc.dir/src/GameEngine.cpp.obj CMakeFiles/KyMonThanToc.dir/src/TextureManager.cpp.obj CMakeFiles/KyMonThanToc.dir/src/main.cpp.obj | C$:/msys64/mingw64/lib/libSDL2main.a C$:/msys64/mingw64/lib/libSDL2.dll.a
   LINK_LIBRARIES = C:/msys64/mingw64/lib/libSDL2main.a  C:/msys64/mingw64/lib/libSDL2.dll.a  -lSDL2_image  -lSDL2_ttf  -lSDL2_mixer  -lshell32  -Wl,--undefined=WinMain  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\KyMonThanToc.dir
   POST_BUILD = cd .

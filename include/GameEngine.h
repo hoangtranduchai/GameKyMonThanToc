@@ -5,6 +5,7 @@
 #include <SDL_mixer.h>
 #include <iostream>
 #include <vector>
+#include "TextureManager.h"
 
 // Forward Declaration để tránh lỗi vòng lặp include
 class IGameState;
@@ -13,6 +14,7 @@ class GameEngine {
 public:
     // Mẫu thiết kế Singleton: Trả về thể hiện duy nhất
     static GameEngine* GetInstance();
+    
     // Hàm hủy Instance
     static void DestroyInstance();
 
@@ -50,9 +52,7 @@ private:
     SDL_Window* m_pWindow;
     SDL_Renderer* m_pRenderer;
 
-    SDL_Texture* m_pPlayerTexture; // "Kết cấu" của nhân vật
     SDL_Rect m_playerDestRect; // "Trạng thái" của nhân vật (Vị trí và Kích thước)
-    SDL_Texture* m_pBackgroundTexture; // "Kết cấu" của nền game
     float m_playerSpeed; // "Tốc độ" của nhân vật (Pixel/giây)
 
     // "Trạng thái" Input của người chơi (Di chuyển)
