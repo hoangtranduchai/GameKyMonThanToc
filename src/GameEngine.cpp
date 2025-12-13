@@ -2,7 +2,6 @@
 #include "Player.h"
 #include "Map.h"
 #include "TextureManager.h"
-#include "Camera.h"
 #include <string>
 
 // Khởi tạo biến static instance
@@ -92,9 +91,6 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     m_windowWidth = w;
     m_windowHeight = h;
 
-    // Khởi tạo Camera với kích thước cửa sổ
-    Camera::GetInstance()->Init(m_windowWidth, m_windowHeight);
-
     // Load Background
     std::string bgPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/background.png";
     if (!TextureManager::GetInstance()->Load(bgPath, "background", m_pRenderer)) {
@@ -121,7 +117,7 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     // Đặt chế độ scale chất lượng cao "nearest" để giữ độ sắc nét cho pixel art
     // (Nếu muốn mượt mà, đổi "nearest" thành "linear")
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest"); 
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1"); 
 
     // LỆNH QUAN TRỌNG NHẤT: Thiết lập kích thước logic
     // SDL sẽ tự động tính toán tỷ lệ zoom để mapRealW x mapRealH vừa khít vào cửa sổ 1280x720
@@ -132,25 +128,26 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
         std::cout << "[He thong] Da kich hoat Auto-Scale cho map: " << mapRealW << "x" << mapRealH << std::endl;
     }
 
-    // Load Player
+    // Load Player Texture
     std::string playerPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png";
     if (!TextureManager::GetInstance()->Load(playerPath, "player", m_pRenderer)) {
         return false;
     }
 
-    int orgW, orgH;
-    TextureManager::GetInstance()->GetTextureSize("player", &orgW, &orgH);
-    
-    // Tinh chỉnh AAA: Player nên cao bằng khoảng 1.5 lần Tile hoặc bằng Tile tùy art
-    // Ở đây giả sử ta muốn Player to bằng 1 ô Tile (32x32) để dễ đi qua cửa
-    int targetPlayerW = 32; 
-    int targetPlayerH = 32; 
+    // --- CẬP NHẬT AAA: SPAWN THEO DỮ LIỆU MAP ---
+    int targetPlayerW = 938; // Kích thước hiển thị Player (bằng TileSize)
+    int targetPlayerH = 938;
 
-    // Tính toán vị trí spawn (ví dụ ô 1,1)
-    int spawnX = 1 * 32;
-    int spawnY = 1 * 32;
+    // Lấy điểm xuất phát từ Map (thay vì số cứng)
+    MapPoint startPos = m_pMap->GetStartPoint();
+    int tileSize = m_pMap->GetTileSize();
+
+    int spawnX = startPos.col * tileSize;
+    int spawnY = startPos.row * tileSize;
 
     m_pPlayer = new Player(new LoaderParams(spawnX, spawnY, targetPlayerW, targetPlayerH, "player"));
+
+    std::cout << "Player spawned at Grid [" << startPos.row << "," << startPos.col << "]" << std::endl;
 
     std::cout << "Game Engine & Player Objects khoi tao thanh cong!" << std::endl;
     m_bRunning = true;
@@ -168,21 +165,6 @@ void GameEngine::HandleEvents() {
         
         if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
             m_bRunning = false;
-        }
-
-        // --- XỬ LÝ ZOOM (LĂN CHUỘT) ---
-        if (event.type == SDL_MOUSEWHEEL) {
-            if (event.wheel.y > 0) { // Lăn lên -> Phóng to
-                Camera::GetInstance()->AddZoom(0.1f);
-            } else if (event.wheel.y < 0) { // Lăn xuống -> Thu nhỏ
-                Camera::GetInstance()->AddZoom(-0.1f);
-            }
-        }
-        
-        // --- XỬ LÝ ZOOM (PHÍM Q/E) ---
-        if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == SDLK_q) Camera::GetInstance()->AddZoom(0.1f);
-            if (event.key.keysym.sym == SDLK_e) Camera::GetInstance()->AddZoom(-0.1f);
         }
     }
 }
@@ -203,16 +185,6 @@ void GameEngine::Update() {
     // Cập nhật Player
     if (m_pPlayer) {
         m_pPlayer->Update();
-
-        // Cập nhật Camera theo vị trí Player
-        int mapPixelW = m_pMap->GetCols() * m_pMap->GetTileSize();
-        int mapPixelH = m_pMap->GetRows() * m_pMap->GetTileSize();
-        
-        // Player lấy vị trí tâm
-        int targetX = m_pPlayer->GetX() + m_pPlayer->GetWidth() / 2;
-        int targetY = m_pPlayer->GetY() + m_pPlayer->GetHeight() / 2;
-
-        Camera::GetInstance()->Update(targetX, targetY, mapPixelW, mapPixelH);
     }
 }
 

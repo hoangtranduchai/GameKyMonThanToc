@@ -3,6 +3,12 @@
 #include <string>
 #include <vector>
 
+// Cấu trúc điểm đơn giản (Tọa độ lưới)
+struct MapPoint {
+    int row;
+    int col;
+};
+
 class Map {
 public:
     Map();
@@ -15,7 +21,7 @@ public:
     void DrawMap();
 
     // Hàm quan trọng để các lớp khác (Player, AI) biết ô nào đi được
-    // Trả về: 0 (Nước/Biên), 1 (Đất/S - Đi được), 2 (Núi - Chặn)
+    // Trả về: 0 (Đất - Đi được), 1 (Núi - Chặn), 2 (Trận Nhãn - Đi được)
     int GetTileID(int row, int col);
 
     // Getter kích thước bản đồ
@@ -42,6 +48,19 @@ public:
         return m_rows * m_tileSize;
     }
 
+    // Lấy tọa độ điểm xuất phát (1,1 theo đề bài)
+    MapPoint GetStartPoint() const {
+        return m_startPoint;
+    }
+
+    // Lấy danh sách các Trận Nhãn để AI tính toán
+    const std::vector<MapPoint>& GetShrines() const {
+        return m_shrines;
+    }
+
+    // Kiểm tra xem ô (row, col) có phải là Trận Nhãn không (Dùng cho logic Khai mở)
+    bool IsShrine(int row, int col);
+
 private:
     // ID của texture tileset
     std::string m_textureID;
@@ -53,4 +72,7 @@ private:
 
     // Dùng vector động để chứa bản đồ kích thước bất kỳ (R x C)
     std::vector<std::vector<int>> m_mapLayer;
+
+    MapPoint m_startPoint;        // Vị trí bắt đầu
+    std::vector<MapPoint> m_shrines; // Danh sách tọa độ các Trận Nhãn
 };

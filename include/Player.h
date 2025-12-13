@@ -24,4 +24,11 @@ private:
     // Vị trí chính xác (float) để di chuyển mượt mà hơn int
     float m_exactX;
     float m_exactY;
+
+    // --- THÊM MỚI CHO DI CHUYỂN THEO Ô ---
+    Uint32 m_lastMoveTime; // Thời điểm di chuyển lần cuối
+
+    // Tốc độ di chuyển: 150ms một bước (số càng nhỏ đi càng nhanh)
+    // Bạn có thể chỉnh số này để game nhanh hay chậm tùy ý
+    const int MOVE_DELAY = 150;
 };
