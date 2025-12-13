@@ -51,6 +51,11 @@ public:
         return m_windowHeight;
     }
 
+    // Player có thể truy cập Map
+    Map* GetMap() const {
+        return m_pMap;
+    }
+
     // Xóa bỏ Copy Constructor và Assignment Operator để đảm bảo tính ĐỘC NHẤT
     GameEngine(const GameEngine&) = delete;
     void operator=(const GameEngine&) = delete;

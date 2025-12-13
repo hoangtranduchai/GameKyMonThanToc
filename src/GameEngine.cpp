@@ -1,5 +1,8 @@
 #include "GameEngine.h"
 #include "Player.h"
+#include "Map.h"
+#include "TextureManager.h"
+#include "Camera.h"
 #include <string>
 
 // Khởi tạo biến static instance
@@ -89,10 +92,44 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     m_windowWidth = w;
     m_windowHeight = h;
 
+    // Khởi tạo Camera với kích thước cửa sổ
+    Camera::GetInstance()->Init(m_windowWidth, m_windowHeight);
+
     // Load Background
     std::string bgPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/background.png";
     if (!TextureManager::GetInstance()->Load(bgPath, "background", m_pRenderer)) {
         return false; 
+    }
+
+    // Load Tileset Image
+    std::string tilePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/tiles.png";
+    if (!TextureManager::GetInstance()->Load(tilePath, "tiles", m_pRenderer)) return false;
+
+    // Khởi tạo Map
+    m_pMap = new Map();
+    std::string mapPath = std::string(PROJECT_ROOT_PATH) + "/assets/maps/level1.txt"; 
+    m_pMap->LoadMap(mapPath);
+
+    // --- AUTO FIT LOGIC ---
+    // Lấy kích thước thực tế của map vừa load
+    int mapRealW = m_pMap->GetMapPixelWidth();
+    int mapRealH = m_pMap->GetMapPixelHeight();
+
+    // Đặt chế độ scale "Letterbox" để giữ nguyên tỉ lệ khung hình
+    // (Nếu map quá dài hoặc quá cao, nó sẽ thêm viền đen thay vì kéo dãn hình ảnh gây méo)
+    SDL_SetHint(SDL_HINT_RENDER_LOGICAL_SIZE_MODE, "letterbox");
+
+    // Đặt chế độ scale chất lượng cao "nearest" để giữ độ sắc nét cho pixel art
+    // (Nếu muốn mượt mà, đổi "nearest" thành "linear")
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest"); 
+
+    // LỆNH QUAN TRỌNG NHẤT: Thiết lập kích thước logic
+    // SDL sẽ tự động tính toán tỷ lệ zoom để mapRealW x mapRealH vừa khít vào cửa sổ 1280x720
+    if (SDL_RenderSetLogicalSize(m_pRenderer, mapRealW, mapRealH) < 0) {
+        std::cout << "[Canh bao] Khong the dat Logical Size! SDL Error: " << SDL_GetError() << std::endl;
+        // Vẫn tiếp tục, nhưng có thể sẽ không scale đúng
+    } else {
+        std::cout << "[He thong] Da kich hoat Auto-Scale cho map: " << mapRealW << "x" << mapRealH << std::endl;
     }
 
     // Load Player
@@ -101,33 +138,19 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
         return false;
     }
 
-    // Khởi tạo đối tượng Player
     int orgW, orgH;
     TextureManager::GetInstance()->GetTextureSize("player", &orgW, &orgH);
     
-    // Tạo đối tượng Player với kích thước scale 20%
-    double scale = 0.2;
-    m_pPlayer = new Player(new LoaderParams(100, 100, (int)(orgW * 0.2), (int)(orgH * 0.2), "player"));
+    // Tinh chỉnh AAA: Player nên cao bằng khoảng 1.5 lần Tile hoặc bằng Tile tùy art
+    // Ở đây giả sử ta muốn Player to bằng 1 ô Tile (32x32) để dễ đi qua cửa
+    int targetPlayerW = 32; 
+    int targetPlayerH = 32; 
 
-    // Load Tileset Image
-    std::string tilePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/tiles.png";
-    if (!TextureManager::GetInstance()->Load(tilePath, "tiles", m_pRenderer)) return false;
+    // Tính toán vị trí spawn (ví dụ ô 1,1)
+    int spawnX = 1 * 32;
+    int spawnY = 1 * 32;
 
-    // Khởi tạo Map
-    m_pMap = new Map();
-
-    // Tạo dữ liệu bản đồ mẫu (Cấp độ 1)
-    // 0: Nước, 1: Đất, 2: Núi
-    int level1[20][25] = {0};
-    for(int i=0; i<20; i++) {
-        for(int j=0; j<25; j++) {
-            if (i==0 || j==0 || i==19 || j==24) level1[i][j] = 2; // Tường bao quanh
-            else level1[i][j] = 1; // Đất ở giữa
-        }
-    }
-    level1[10][10] = 2; // Thêm hòn núi giữa nhà
-
-    m_pMap->LoadMap(level1);
+    m_pPlayer = new Player(new LoaderParams(spawnX, spawnY, targetPlayerW, targetPlayerH, "player"));
 
     std::cout << "Game Engine & Player Objects khoi tao thanh cong!" << std::endl;
     m_bRunning = true;
@@ -145,6 +168,21 @@ void GameEngine::HandleEvents() {
         
         if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
             m_bRunning = false;
+        }
+
+        // --- XỬ LÝ ZOOM (LĂN CHUỘT) ---
+        if (event.type == SDL_MOUSEWHEEL) {
+            if (event.wheel.y > 0) { // Lăn lên -> Phóng to
+                Camera::GetInstance()->AddZoom(0.1f);
+            } else if (event.wheel.y < 0) { // Lăn xuống -> Thu nhỏ
+                Camera::GetInstance()->AddZoom(-0.1f);
+            }
+        }
+        
+        // --- XỬ LÝ ZOOM (PHÍM Q/E) ---
+        if (event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_q) Camera::GetInstance()->AddZoom(0.1f);
+            if (event.key.keysym.sym == SDLK_e) Camera::GetInstance()->AddZoom(-0.1f);
         }
     }
 }
@@ -165,6 +203,16 @@ void GameEngine::Update() {
     // Cập nhật Player
     if (m_pPlayer) {
         m_pPlayer->Update();
+
+        // Cập nhật Camera theo vị trí Player
+        int mapPixelW = m_pMap->GetCols() * m_pMap->GetTileSize();
+        int mapPixelH = m_pMap->GetRows() * m_pMap->GetTileSize();
+        
+        // Player lấy vị trí tâm
+        int targetX = m_pPlayer->GetX() + m_pPlayer->GetWidth() / 2;
+        int targetY = m_pPlayer->GetY() + m_pPlayer->GetHeight() / 2;
+
+        Camera::GetInstance()->Update(targetX, targetY, mapPixelW, mapPixelH);
     }
 }
 
@@ -173,19 +221,17 @@ void GameEngine::Render() {
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(m_pRenderer);
     
-    // Vẽ Background (Dùng Draw tĩnh)
-    // Vẽ full màn hình: x=0, y=0, w=windowWidth, h=windowHeight
-    TextureManager::GetInstance()->Draw("background", 0, 0, m_windowWidth, m_windowHeight, m_pRenderer);
-
-    // Vẽ Map
+    // Vẽ Map (Vẽ tại tọa độ gốc 0,0 vì Logical Size đã lo việc hiển thị)
     if (m_pMap) {
-        m_pMap->DrawMap();
+        m_pMap->DrawMap(); 
     }
 
-    // Vẽ Player (Dùng Draw tĩnh hoặc DrawFrame nếu muốn animation)
+    // Vẽ Player
     if (m_pPlayer) {
         m_pPlayer->Draw();
     }
+    
+    // Vẽ UI ở đây (ví dụ điểm số, thời gian...) sẽ luôn nằm trên cùng và không bị zoom
     
     SDL_RenderPresent(m_pRenderer);
 }

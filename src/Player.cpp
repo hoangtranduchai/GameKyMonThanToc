@@ -1,5 +1,7 @@
 #include "Player.h"
 #include "GameEngine.h"
+#include "Map.h"
+#include "Camera.h"
 
 Player::Player(const LoaderParams* pParams) : GameObject(pParams) {
     // Giải nén tham số từ LoaderParams vào biến thành viên
@@ -50,36 +52,66 @@ void Player::HandleInput() {
         m_flip = SDL_FLIP_NONE;
     }
 
-    // Chuẩn hóa vector (tránh đi chéo nhanh hơn)
-    if (moveX != 0 || moveY != 0) {
-        float length = sqrt(moveX * moveX + moveY * moveY);
-        moveX /= length;
-        moveY /= length;
+    if (moveX == 0 && moveY == 0) return;
 
-        // Lấy DeltaTime từ Engine
-        float dt = GameEngine::GetInstance()->GetDeltaTime();
+    // Chuẩn hóa vector
+    float length = sqrt(moveX * moveX + moveY * moveY);
+    moveX /= length;
+    moveY /= length;
 
-        // Cập nhật vị trí chính xác
-        m_exactX += moveX * m_moveSpeed * dt;
-        m_exactY += moveY * m_moveSpeed * dt;
+    float dt = GameEngine::GetInstance()->GetDeltaTime();
+    Map* pMap = GameEngine::GetInstance()->GetMap();
+    int tileSize = pMap->GetTileSize();
+
+    // --- KỸ THUẬT CHECK VA CHẠM AAA (Sliding) ---
+    // Kiểm tra trục X trước
+    float nextX = m_exactX + moveX * m_moveSpeed * dt;
+    // Kiểm tra 4 góc hoặc đơn giản là tâm + bán kính biên
+    // Ở đây ta check tâm để đơn giản hóa nhưng tách trục
+    int colX = (int)((nextX + m_width / 2) / tileSize);
+    int rowCurr = (int)((m_exactY + m_height / 2) / tileSize);
+
+    if (pMap->GetTileID(rowCurr, colX) != 1) { // 1 là Núi
+        m_exactX = nextX; // Không va chạm X -> Di chuyển X
+    }
+
+    // Kiểm tra trục Y sau (độc lập với X)
+    float nextY = m_exactY + moveY * m_moveSpeed * dt;
+    int colCurr = (int)((m_exactX + m_width / 2) / tileSize);
+    int rowY = (int)((nextY + m_height / 2) / tileSize);
+
+    if (pMap->GetTileID(rowY, colCurr) != 1) { // 1 là Núi
+        m_exactY = nextY; // Không va chạm Y -> Di chuyển Y
     }
 }
 
 void Player::Update() {
-    HandleInput(); // Xử lý di chuyển
+    HandleInput(); // Xử lý di chuyển & Va chạm Tile
 
-    // Cập nhật vị trí hiển thị (int) từ vị trí chính xác (float)
+    // Lấy kích thước Map thực tế (Pixel)
+    Map* pMap = GameEngine::GetInstance()->GetMap();
+    int mapPixelW = pMap->GetMapPixelWidth();
+    int mapPixelH = pMap->GetMapPixelHeight();
+
+    // Kẹp tọa độ X
+    if (m_exactX < 0) {
+        m_exactX = 0;
+    }
+    else if (m_exactX + m_width > mapPixelW) {
+        m_exactX = (float)(mapPixelW - m_width);
+    }
+
+    // Kẹp tọa độ Y
+    if (m_exactY < 0) {
+        m_exactY = 0;
+    }
+    else if (m_exactY + m_height > mapPixelH) {
+        m_exactY = (float)(mapPixelH - m_height);
+    }
+
+    // Đồng bộ về tọa độ nguyên (int) để vẽ
     m_x = (int)m_exactX;
     m_y = (int)m_exactY;
-
-    // Giới hạn biên (Lấy kích thước cửa sổ từ Engine)
-    int winW = GameEngine::GetInstance()->GetWindowWidth();
-    int winH = GameEngine::GetInstance()->GetWindowHeight();
-
-    if (m_x < 0) { m_x = 0; m_exactX = 0; }
-    if (m_x + m_width > winW) { m_x = winW - m_width; m_exactX = (float)m_x; }
-    if (m_y < 0) { m_y = 0; m_exactY = 0; }
-    if (m_y + m_height > winH) { m_y = winH - m_height; m_exactY = (float)m_y; }
     
     // Animation đơn giản (nếu có sprite sheet)
     // m_currentFrame = int(((SDL_GetTicks() / 100) % 6)); 

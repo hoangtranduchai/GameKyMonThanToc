@@ -28,6 +28,22 @@ public:
     virtual void Update() = 0;
     virtual void Clean() = 0;
 
+    int GetX() const {
+        return m_x;
+    }
+
+    int GetY() const {
+        return m_y;
+    }
+
+    int GetWidth() const {
+        return m_width;
+    }
+
+    int GetHeight() const {
+        return m_height;
+    }
+
 protected:
     // Mọi đối tượng đều cần vị trí và kích thước
     int m_x;
