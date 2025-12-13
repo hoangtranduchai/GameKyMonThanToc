@@ -5,11 +5,32 @@
 static Uint32 s_lastTick = 0;
 static float s_deltaTime = 0.0f;
 
+// Khởi tạo biến static instance
+GameEngine* GameEngine::s_Instance = nullptr;
+
+// Singleton Pattern: Trả về thể hiện duy nhất
+GameEngine* GameEngine::GetInstance() {
+    if (s_Instance == nullptr) {
+        s_Instance = new GameEngine();
+    }
+    return s_Instance;
+}
+
+// Hàm hủy Instance
+void GameEngine::DestroyInstance() {
+    if (s_Instance != nullptr) {
+        delete s_Instance;
+        s_Instance = nullptr;
+    }
+}
+
+// CONSTRUCTOR (PRIVATE)
 GameEngine::GameEngine() {
     // Khởi tạo mọi con trỏ về nullptr là "chuẩn mực"
     m_pWindow = nullptr;
     m_pRenderer = nullptr;
     m_pPlayerTexture = nullptr;
+    m_pBackgroundTexture = nullptr;
     m_bRunning = false; // Game chưa chạy
 
     // Khởi tạo tốc độ và trạng thái input "chuẩn mực"
@@ -57,6 +78,7 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     if (fullscreen) {
         flags = SDL_WINDOW_FULLSCREEN;
     }
+
     m_pWindow = SDL_CreateWindow(title, x, y, w, h, flags);
     if (m_pWindow == nullptr) {
         std::cout << "Không thể tạo cửa sổ! Lỗi SDL: " << SDL_GetError() << std::endl;
@@ -77,12 +99,19 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Đặt màu vẽ mặc định cho trình kết xuất (Màu đen)
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
 
+    // Tải "Kết cấu" nền "hùng vĩ"
+    std::string backgroundPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/background.png";
+    m_pBackgroundTexture = IMG_LoadTexture(m_pRenderer, backgroundPath.c_str());
+    if (m_pBackgroundTexture == nullptr) {
+        std::cout << "Không thể tải texture nền tại: '" << backgroundPath << "'! Lỗi: " << IMG_GetError() << std::endl;
+        // Nếu không có nền, game vẫn có thể chạy nhưng sẽ ít "mãn nhãn" hơn.
+    }
+
     // Xây dựng đường dẫn tuyệt đối bằng Macro từ CMake
-    std::string imagePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png";
-    
-    m_pPlayerTexture = IMG_LoadTexture(m_pRenderer, imagePath.c_str());
+    std::string playerPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png";
+    m_pPlayerTexture = IMG_LoadTexture(m_pRenderer, playerPath.c_str());
     if (m_pPlayerTexture == nullptr) {
-        std::cout << "Không thể tải texture tại: '" << imagePath << "'! Lỗi: " << IMG_GetError() << std::endl;
+        std::cout << "Không thể tải texture tại: '" << playerPath << "'! Lỗi: " << IMG_GetError() << std::endl;
         // Chúng ta vẫn có thể return true để chạy game dù không có hình ảnh
         // (hoặc return false nếu hình ảnh này là "tối quan trọng")
     }
@@ -90,15 +119,22 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Khởi tạo vị trí và kích thước ban đầu cho nhân vật
     m_playerDestRect.x = 100;
     m_playerDestRect.y = 100;
-    // Lấy kích thước từ texture
-    SDL_QueryTexture(m_pPlayerTexture, NULL, NULL, &m_playerDestRect.w, &m_playerDestRect.h);
+    if (m_pPlayerTexture) {
+        // Lấy kích thước từ texture
+        SDL_QueryTexture(m_pPlayerTexture, NULL, NULL, &m_playerDestRect.w, &m_playerDestRect.h);
+    
+        // Scale (0.2 = giảm còn 20%)
+        const float playerScale = 0.2f;
+        m_playerDestRect.w = static_cast<int>(m_playerDestRect.w * playerScale);
+        m_playerDestRect.h = static_cast<int>(m_playerDestRect.h * playerScale);
 
-    // Scale (0.2 = giảm còn 20%)
-    const float playerScale = 0.2f;
-    m_playerDestRect.w = static_cast<int>(m_playerDestRect.w * playerScale);
-    m_playerDestRect.h = static_cast<int>(m_playerDestRect.h * playerScale);
+    } else {
+        // Nếu không có texture, đặt kích thước mặc định
+        m_playerDestRect.w = 50;
+        m_playerDestRect.h = 50;
+    }
 
-    std::cout << "Game Engine khởi tạo thành công!" << std::endl;
+    std::cout << "Game Engine (Singleton) khởi tạo thành công!" << std::endl;
     m_bRunning = true;
     return true;
 }
@@ -107,7 +143,11 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 void GameEngine::Quit() {
     std::cout << "Game Engine đang dọn dẹp và kết thúc..." << std::endl;
 
-    // Dọn dẹp "Kết cấu" (Texture)
+    // Dọn dẹp "Kết cấu" nền
+    SDL_DestroyTexture(m_pBackgroundTexture);
+    m_pBackgroundTexture = nullptr;
+
+    // Dọn dẹp "Kết cấu" (Texture) của nhân vật
     SDL_DestroyTexture(m_pPlayerTexture);
     m_pPlayerTexture = nullptr;
 
@@ -123,6 +163,9 @@ void GameEngine::Quit() {
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();
+
+    // Tự hủy Instance
+    m_bRunning = false;
     
     std::cout << "Game Engine đã dọn dẹp và kết thúc!" << std::endl;
 }
@@ -150,6 +193,9 @@ void GameEngine::HandleEvents() {
                     break;
                 case SDLK_d: case SDLK_RIGHT: // Phím D, Phím phải
                     m_movingRight = true; // Di chuyển sang phải
+                    break;
+                case SDLK_ESCAPE: // Phím ESC
+                    m_bRunning = false; // Thoát game
                     break;
             }
         }
@@ -230,9 +276,17 @@ void GameEngine::Render() {
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(m_pRenderer);
     
-    // VẼ "KIỆT TÁC"
-    // Vẽ Texture của người chơi tại vị trí m_playerDestRect
-    SDL_RenderCopy(m_pRenderer, m_pPlayerTexture, NULL, &m_playerDestRect);
+    // Vẽ Background
+    if (m_pBackgroundTexture) {
+        // Vẽ toàn bộ background để lấp đầy cửa sổ
+        SDL_RenderCopy(m_pRenderer, m_pBackgroundTexture, NULL, NULL); 
+    }
+
+    // Vẽ Player
+    // Vẽ Texture của người chơi tại vị trí m_playerDestRect (luôn nằm trên background)
+    if (m_pPlayerTexture) {
+        SDL_RenderCopy(m_pRenderer, m_pPlayerTexture, NULL, &m_playerDestRect);
+    }
     
     // Hiển thị mọi thứ đã vẽ ra màn hình
     SDL_RenderPresent(m_pRenderer);
