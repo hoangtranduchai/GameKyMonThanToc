@@ -79,9 +79,13 @@ void Player::HandleInput() {
             m_y = nextRow * tileSize;
             m_lastMoveTime = currentTime;
 
-            // --- KIỂM TRA TƯƠNG TÁC GAMEPLAY ---
-            if (nextTileID == 2) { // 2 là Trận Nhãn (Shrine)
-                std::cout << ">>> KHAI MO TRAN NHAN TAI [" << nextRow << "," << nextCol << "] <<<" << std::endl;
+            // --- BÁO CÁO CHO ENGINE (AAA LOGIC) ---
+            // 1. Báo cáo đã di chuyển
+            GameEngine::GetInstance()->OnPlayerMove();
+
+            // 2. Báo cáo nếu gặp Trận Nhãn
+            if (nextTileID == 2) {
+                GameEngine::GetInstance()->OnShrineVisited(nextRow, nextCol);
                 // Sau này sẽ thêm code phát âm thanh hoặc hiệu ứng tại đây
             }
         }

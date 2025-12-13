@@ -1,4 +1,5 @@
 #pragma once
+#include <SDL_ttf.h>
 #include "GameEngine.h"
 #include <string>
 #include <map>
@@ -36,6 +37,13 @@ public:
         return s_Instance;
     }
 
+    // --- THÊM MỚI CHO HỆ THỐNG FONT AAA ---
+    // Tải font với kích thước cụ thể
+    bool LoadFont(std::string fileName, std::string id, int size);
+    
+    // Vẽ chữ lên màn hình
+    void DrawText(std::string fontId, std::string text, int x, int y, SDL_Color color, SDL_Renderer* pRenderer);
+
 private:
     TextureManager() {}
     ~TextureManager() {}
@@ -44,4 +52,7 @@ private:
     std::map<std::string, SDL_Texture*> m_textureMap;
 
     static TextureManager* s_Instance;
+
+    // Kho chứa Font
+    std::map<std::string, TTF_Font*> m_fontMap;
 };

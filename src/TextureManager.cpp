@@ -82,12 +82,20 @@ void TextureManager::Drop(std::string id) {
 
 // Dọn dẹp toàn bộ khi thoát game
 void TextureManager::Clean() {
-    std::map<std::string, SDL_Texture*>::iterator iter;
-    for (iter = m_textureMap.begin(); iter != m_textureMap.end(); iter++) {
-        SDL_DestroyTexture(iter->second);
+    std::map<std::string, SDL_Texture*>::iterator textureIter;
+    for (textureIter = m_textureMap.begin(); textureIter != m_textureMap.end(); textureIter++) {
+        SDL_DestroyTexture(textureIter->second);
     }
     m_textureMap.clear();
-    std::cout << "[Hệ thống] Da don dep toan bo Texture Manager!" << std::endl;
+    
+    // Xóa Font
+    std::map<std::string, TTF_Font*>::iterator fontIter;
+    for (fontIter = m_fontMap.begin(); fontIter != m_fontMap.end(); fontIter++) {
+        TTF_CloseFont(fontIter->second);
+    }
+    m_fontMap.clear();
+    
+    std::cout << "[He thong] Da don dep Texture va Font Manager!" << std::endl;
 }
 
 // Hàm lấy kích thước ảnh
@@ -117,4 +125,36 @@ void TextureManager::DrawTile(std::string id, int margin, int spacing, int x, in
     destRect.h = height;
 
     SDL_RenderCopyEx(pRenderer, m_textureMap[id], &srcRect, &destRect, 0, 0, SDL_FLIP_NONE);
+}
+
+bool TextureManager::LoadFont(std::string fileName, std::string id, int size) {
+    TTF_Font* pFont = TTF_OpenFont(fileName.c_str(), size);
+    if (pFont == nullptr) {
+        std::cout << "[Lỗi AAA] Khong the tai font: " << fileName << " - Lỗi: " << TTF_GetError() << std::endl;
+        return false;
+    }
+    m_fontMap[id] = pFont;
+    return true;
+}
+
+void TextureManager::DrawText(std::string fontId, std::string text, int x, int y, SDL_Color color, SDL_Renderer* pRenderer) {
+    if (m_fontMap[fontId] == nullptr) return;
+
+    // Tạo surface từ text
+    SDL_Surface* pSurface = TTF_RenderText_Solid(m_fontMap[fontId], text.c_str(), color);
+    if (pSurface == nullptr) return;
+
+    // Tạo texture từ surface
+    SDL_Texture* pTexture = SDL_CreateTextureFromSurface(pRenderer, pSurface);
+    
+    // Thiết lập khung hình chữ nhật chứa text
+    SDL_Rect srcRect = {0, 0, pSurface->w, pSurface->h};
+    SDL_Rect destRect = {x, y, pSurface->w, pSurface->h};
+
+    // Vẽ lên màn hình
+    SDL_RenderCopy(pRenderer, pTexture, &srcRect, &destRect);
+
+    // Dọn dẹp bộ nhớ ngay lập tức
+    SDL_FreeSurface(pSurface);
+    SDL_DestroyTexture(pTexture);
 }

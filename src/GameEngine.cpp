@@ -32,6 +32,9 @@ GameEngine::GameEngine() {
     m_pMap = nullptr;    // Khởi tạo con trỏ Map
     m_deltaTime = 0.0f;
     m_optimalSteps = 0;
+    m_currentSteps = 0;
+    m_shrinesCollected = 0;
+    m_totalShrines = 0;
 }
 
 GameEngine::~GameEngine() {
@@ -132,13 +135,26 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     // --- KÍCH HOẠT THIÊN CƠ (AI) ---
     // Tính toán ngay lập tức ma trận khoảng cách và Thiên Mệnh
-    
+
     // 1. Tính Insight
     std::vector<std::vector<int>> insightMatrix = ThienCoEngine::GetInstance()->CalculateInsight(m_pMap);
 
     // 2. Tính Destiny (Thiên Mệnh)
     DestinyResult destiny = ThienCoEngine::GetInstance()->CalculateDestiny(insightMatrix);
     m_optimalSteps = destiny.totalSteps; // Lưu kết quả
+
+    // Cập nhật tổng số Shrine từ Map
+    m_totalShrines = m_pMap->GetShrines().size();
+
+    // --- LOAD FONT CHO HUD ---
+    // Vì Logical Height có thể lên tới 2000-3000px, Font size phải to tương ứng
+    // Công thức: Size = LogicalHeight / 20 (Ví dụ)
+    int fontSize = m_pMap->GetMapPixelHeight() / 15; 
+    std::string fontPath = std::string(PROJECT_ROOT_PATH) + "/assets/fonts/Roboto-Regular.ttf"; 
+    
+    // Nếu chưa có file font, hãy tạo folder assets/fonts và copy file ttf vào!
+    // Ở đây tôi giả định bạn sẽ làm việc đó.
+    TextureManager::GetInstance()->LoadFont(fontPath, "gui_font", fontSize);
 
     // Load Player Texture
     std::string playerPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png";
@@ -200,6 +216,30 @@ void GameEngine::Update() {
     }
 }
 
+void GameEngine::OnPlayerMove() {
+    m_currentSteps++;
+    // Có thể thêm âm thanh bước chân tại đây
+}
+
+void GameEngine::OnShrineVisited(int row, int col) {
+    // Kiểm tra xem shrine này đã mở chưa
+    for (auto& pos : m_visitedShrinesList) {
+        if (pos.first == row && pos.second == col) return; // Đã mở rồi
+    }
+
+    // Đánh dấu đã mở
+    m_visitedShrinesList.push_back({row, col});
+    m_shrinesCollected++;
+    
+    std::cout << ">>> DA KHAI MO TRAN NHAN! (" << m_shrinesCollected << "/" << m_totalShrines << ")" << std::endl;
+
+    // Kiểm tra Chiến Thắng
+    if (m_shrinesCollected >= m_totalShrines) {
+        std::cout << "!!! CHUC MUNG - BAN DA HOAN THANH THIEN MENH !!!" << std::endl;
+        // Logic Pause game hoặc hiện màn hình Win sẽ làm sau
+    }
+}
+
 // Render Đồ họa
 void GameEngine::Render() {
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
@@ -215,7 +255,19 @@ void GameEngine::Render() {
         m_pPlayer->Draw();
     }
     
-    // Vẽ UI ở đây (ví dụ điểm số, thời gian...) sẽ luôn nằm trên cùng và không bị zoom
+    // --- VẼ HUD (GIAO DIỆN NGƯỜI DÙNG) ---
+    // Màu chữ: Trắng sáng (hoặc Vàng kim loại cho sang trọng)
+    SDL_Color textColor = {255, 215, 0, 255}; // Gold Color
+
+    // Chuẩn bị nội dung text
+    std::string stepText = "Buoc: " + std::to_string(m_currentSteps) + " / " + std::to_string(m_optimalSteps);
+    std::string shrineText = "Tran Nhan: " + std::to_string(m_shrinesCollected) + " / " + std::to_string(m_totalShrines);
+
+    // Lấy kích thước Map để căn chỉnh vị trí (Vẽ ở góc trên trái)
+    int margin = m_pMap->GetMapPixelHeight() / 30;
+    
+    TextureManager::GetInstance()->DrawText("gui_font", stepText, margin, margin, textColor, m_pRenderer);
+    TextureManager::GetInstance()->DrawText("gui_font", shrineText, margin, margin * 3, textColor, m_pRenderer);
     
     SDL_RenderPresent(m_pRenderer);
 }

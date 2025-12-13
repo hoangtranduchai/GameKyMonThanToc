@@ -65,6 +65,22 @@ public:
     GameEngine(const GameEngine&) = delete;
     void operator=(const GameEngine&) = delete;
 
+    // --- CÁC HÀM GAMEPLAY LOGIC ---
+    void OnPlayerMove(); // Gọi khi nhân vật di chuyển
+    void OnShrineVisited(int row, int col); // Gọi khi nhân vật đến Trận Nhãn
+
+    int GetCurrentSteps() const {
+        return m_currentSteps;
+    }
+
+    int GetShrinesCollected() const {
+        return m_shrinesCollected;
+    }
+
+    int GetTotalShrines() const {
+        return m_totalShrines;
+    }
+
 private:
     // Private constructor cho Singleton
     GameEngine();
@@ -94,4 +110,12 @@ private:
 
     // Số bước tối ưu (Từ Thiên Cơ) để hiển thị trên UI
     int m_optimalSteps;
+
+    // Biến Gameplay
+    int m_currentSteps;      // Số bước người chơi đã đi
+    int m_shrinesCollected;  // Số Trận Nhãn đã mở
+    int m_totalShrines;      // Tổng số Trận Nhãn cần mở
+    
+    // Danh sách các vị trí Trận Nhãn đã mở (để không tính điểm 2 lần)
+    std::vector<std::pair<int, int>> m_visitedShrinesList;
 };
