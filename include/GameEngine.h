@@ -6,6 +6,7 @@
 #include <iostream>
 #include <vector>
 #include "TextureManager.h"
+#include "Map.h"
 
 // Forward Declaration để tránh lỗi vòng lặp include
 class IGameState;
@@ -77,4 +78,7 @@ private:
 
     // Con trỏ đến Player
     Player* m_pPlayer;
+
+    // Con trỏ đến Map
+    Map* m_pMap;
 };

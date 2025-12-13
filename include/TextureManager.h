@@ -24,6 +24,9 @@ public:
     
     // Lấy kích thước ảnh (để tính toán va chạm hoặc scale)
     void GetTextureSize(std::string id, int* w, int* h);
+
+    // Hàm vẽ Tile chuyên dụng (dùng cho bản đồ)
+    void DrawTile(std::string id, int margin, int spacing, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer);
     
     // Singleton Instance
     static TextureManager* GetInstance() {

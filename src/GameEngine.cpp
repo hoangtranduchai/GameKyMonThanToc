@@ -26,6 +26,7 @@ GameEngine::GameEngine() {
     m_pRenderer = nullptr;
     m_bRunning = false; // Game chưa chạy
     m_pPlayer = nullptr; // Khởi tạo con trỏ Player
+    m_pMap = nullptr;    // Khởi tạo con trỏ Map
     m_deltaTime = 0.0f;
 }
 
@@ -108,6 +109,26 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     double scale = 0.2;
     m_pPlayer = new Player(new LoaderParams(100, 100, (int)(orgW * 0.2), (int)(orgH * 0.2), "player"));
 
+    // Load Tileset Image
+    std::string tilePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/tiles.png";
+    if (!TextureManager::GetInstance()->Load(tilePath, "tiles", m_pRenderer)) return false;
+
+    // Khởi tạo Map
+    m_pMap = new Map();
+
+    // Tạo dữ liệu bản đồ mẫu (Cấp độ 1)
+    // 0: Nước, 1: Đất, 2: Núi
+    int level1[20][25] = {0};
+    for(int i=0; i<20; i++) {
+        for(int j=0; j<25; j++) {
+            if (i==0 || j==0 || i==19 || j==24) level1[i][j] = 2; // Tường bao quanh
+            else level1[i][j] = 1; // Đất ở giữa
+        }
+    }
+    level1[10][10] = 2; // Thêm hòn núi giữa nhà
+
+    m_pMap->LoadMap(level1);
+
     std::cout << "Game Engine & Player Objects khoi tao thanh cong!" << std::endl;
     m_bRunning = true;
     return true;
@@ -156,6 +177,11 @@ void GameEngine::Render() {
     // Vẽ full màn hình: x=0, y=0, w=windowWidth, h=windowHeight
     TextureManager::GetInstance()->Draw("background", 0, 0, m_windowWidth, m_windowHeight, m_pRenderer);
 
+    // Vẽ Map
+    if (m_pMap) {
+        m_pMap->DrawMap();
+    }
+
     // Vẽ Player (Dùng Draw tĩnh hoặc DrawFrame nếu muốn animation)
     if (m_pPlayer) {
         m_pPlayer->Draw();
@@ -171,6 +197,11 @@ void GameEngine::Quit() {
         m_pPlayer->Clean();
         delete m_pPlayer;
         m_pPlayer = nullptr;
+    }
+    // Dọn dẹp Map
+    if (m_pMap) {
+        delete m_pMap;
+        m_pMap = nullptr;
     }
 
     TextureManager::GetInstance()->Clean();

@@ -99,3 +99,22 @@ void TextureManager::GetTextureSize(std::string id, int* w, int* h) {
         *h = 0;
     }
 }
+
+// Hàm vẽ Tile chuyên dụng (dùng cho bản đồ)
+void TextureManager::DrawTile(std::string id, int margin, int spacing, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer) {
+    SDL_Rect srcRect;
+    SDL_Rect destRect;
+
+    // Tính toán vị trí tile trong ảnh tileset
+    srcRect.x = margin + (spacing + width) * currentFrame;
+    srcRect.y = margin + (spacing + height) * (currentRow - 1);
+    srcRect.w = width;
+    srcRect.h = height;
+
+    destRect.x = x;
+    destRect.y = y;
+    destRect.w = width;
+    destRect.h = height;
+
+    SDL_RenderCopyEx(pRenderer, m_textureMap[id], &srcRect, &destRect, 0, 0, SDL_FLIP_NONE);
+}
