@@ -9,6 +9,7 @@
 
 // Forward Declaration để tránh lỗi vòng lặp include
 class IGameState;
+class Player;
 
 class GameEngine {
 public:
@@ -33,6 +34,22 @@ public:
         return m_bRunning;
     }
 
+    SDL_Renderer* GetRenderer() const {
+        return m_pRenderer;
+    
+    }
+    float GetDeltaTime() const {
+        return m_deltaTime;
+    }
+
+    int GetWindowWidth() const {
+        return m_windowWidth;
+    }
+
+    int GetWindowHeight() const {
+        return m_windowHeight;
+    }
+
     // Xóa bỏ Copy Constructor và Assignment Operator để đảm bảo tính ĐỘC NHẤT
     GameEngine(const GameEngine&) = delete;
     void operator=(const GameEngine&) = delete;
@@ -45,23 +62,19 @@ private:
     // Biến tĩnh lưu trữ thể hiện duy nhất
     static GameEngine* s_Instance;
 
+    // Thời gian giữa các khung hình
+    float m_deltaTime;
+
     // Lưu trữ các trạng thái game
     std::vector<IGameState*> m_States;
-
     bool m_bRunning;
     SDL_Window* m_pWindow;
     SDL_Renderer* m_pRenderer;
-
-    SDL_Rect m_playerDestRect; // "Trạng thái" của nhân vật (Vị trí và Kích thước)
-    float m_playerSpeed; // "Tốc độ" của nhân vật (Pixel/giây)
-
-    // "Trạng thái" Input của người chơi (Di chuyển)
-    bool m_movingUp;
-    bool m_movingDown;
-    bool m_movingLeft;
-    bool m_movingRight;
-
+    
     // Kích thước cửa sổ để giới hạn di chuyển
     int m_windowWidth;
     int m_windowHeight;
+
+    // Con trỏ đến Player
+    Player* m_pPlayer;
 };
