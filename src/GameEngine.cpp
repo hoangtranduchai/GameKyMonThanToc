@@ -2,6 +2,7 @@
 #include "Player.h"
 #include "Map.h"
 #include "TextureManager.h"
+#include "ThienCoEngine.h"
 #include <string>
 
 // Khởi tạo biến static instance
@@ -30,6 +31,7 @@ GameEngine::GameEngine() {
     m_pPlayer = nullptr; // Khởi tạo con trỏ Player
     m_pMap = nullptr;    // Khởi tạo con trỏ Map
     m_deltaTime = 0.0f;
+    m_optimalSteps = 0;
 }
 
 GameEngine::~GameEngine() {
@@ -127,6 +129,16 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     } else {
         std::cout << "[He thong] Da kich hoat Auto-Scale cho map: " << mapRealW << "x" << mapRealH << std::endl;
     }
+
+    // --- KÍCH HOẠT THIÊN CƠ (AI) ---
+    // Tính toán ngay lập tức ma trận khoảng cách và Thiên Mệnh
+    
+    // 1. Tính Insight
+    std::vector<std::vector<int>> insightMatrix = ThienCoEngine::GetInstance()->CalculateInsight(m_pMap);
+
+    // 2. Tính Destiny (Thiên Mệnh)
+    DestinyResult destiny = ThienCoEngine::GetInstance()->CalculateDestiny(insightMatrix);
+    m_optimalSteps = destiny.totalSteps; // Lưu kết quả
 
     // Load Player Texture
     std::string playerPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png";

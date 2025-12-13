@@ -58,8 +58,7 @@ void Map::LoadMap(std::string path) {
         }
     }
 
-    // Vị trí bắt đầu luôn là (1,1) theo đề bài
-    m_startPoint = {1, 1};
+    m_startPoint = {0, 0};
 
     inputFile.close();
     std::cout << "[He thong] Map Loaded (" << m_rows << "x" << m_cols << "). Tim thay " << m_shrines.size() << " Tran Nhan." << std::endl;

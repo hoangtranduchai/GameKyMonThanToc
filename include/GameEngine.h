@@ -56,6 +56,11 @@ public:
         return m_pMap;
     }
 
+    // Getter cho UI sau này
+    int GetOptimalSteps() const {
+        return m_optimalSteps;
+    }
+
     // Xóa bỏ Copy Constructor và Assignment Operator để đảm bảo tính ĐỘC NHẤT
     GameEngine(const GameEngine&) = delete;
     void operator=(const GameEngine&) = delete;
@@ -86,4 +91,7 @@ private:
 
     // Con trỏ đến Map
     Map* m_pMap;
+
+    // Số bước tối ưu (Từ Thiên Cơ) để hiển thị trên UI
+    int m_optimalSteps;
 };
