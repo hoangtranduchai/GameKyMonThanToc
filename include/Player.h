@@ -5,7 +5,6 @@
 enum PlayerState {
     STATE_IDLE,
     STATE_RUN,
-    STATE_ATTACK
 };
 
 enum PlayerDirection {
@@ -35,42 +34,25 @@ private:
     // Hàm xử lý input riêng cho Player
     void HandleInput();
     
-    // Di chuyển logic từ GameEngine sang đây
-    float m_moveSpeed;
+    // --- BIẾN LOGIC DI CHUYỂN ---
+    Uint32 m_lastMoveTime; 
+    const int MOVE_DELAY = 150; // Tốc độ lướt đi
 
-    // Vị trí chính xác (float) để di chuyển mượt mà hơn int
-    float m_exactX;
-    float m_exactY;
-
-    // --- THÊM MỚI CHO DI CHUYỂN THEO Ô ---
-    Uint32 m_lastMoveTime; // Thời điểm di chuyển lần cuối
-
-    // Tốc độ di chuyển: 150ms một bước (số càng nhỏ đi càng nhanh)
-    // Bạn có thể chỉnh số này để game nhanh hay chậm tùy ý
-    const int MOVE_DELAY = 150;
-
-    // --- BIẾN CHO VISUAL AAA ---
+    // --- BIẾN VISUAL AAA (Giữ lại để mượt mà) ---
     float m_visualX;
     float m_visualY;
+    const float SMOOTH_SPEED = 12.0f; // Độ mượt khi nội suy
+    float m_scale;                    // Tỷ lệ phóng to nhân vật
     
-    // Tốc độ trôi (Interpolation Speed)
-    // Giá trị càng lớn trôi càng nhanh. 10.0f - 15.0f là đẹp.
-    const float SMOOTH_SPEED = 12.0f; 
-    
-    // Biến Animation
-    int m_animSpeed;   // Tốc độ chuyển frame
-    int m_numFrames;   // Tổng số frame trong sprite sheet
+    // --- BIẾN ANIMATION ---
+    int m_animSpeed;
+    int m_numFrames;
 
-    // --- BIẾN QUẢN LÝ ANIMATION AAA ---
+    // --- QUẢN LÝ TRẠNG THÁI ---
     PlayerState m_currentState;
+    PlayerState m_lastState;
     PlayerDirection m_currentDirection;
-
-    // Thêm biến để theo dõi trạng thái cũ -> Reset frame khi đổi hành động
-    PlayerState m_lastState; 
     PlayerDirection m_lastDirection;
     
-    // Hàm cập nhật Texture ID dựa trên Trạng thái & Hướng
     void UpdateAnimationID();
-
-    float m_scale; // Tỷ lệ phóng to (ví dụ: 1.5, 2.0)
 };

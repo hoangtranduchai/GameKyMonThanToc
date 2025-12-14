@@ -71,10 +71,6 @@ void Player::UpdateAnimationID() {
             actionStr = "run";
             m_animSpeed = 80;  // Chạy nhanh (80ms/frame) -> Mượt hơn
             break;
-        case STATE_ATTACK:
-            actionStr = "attack1";
-            m_animSpeed = 60;  // Đánh cực nhanh
-            break;
     }
 
     // 2. Xác định chuỗi Hướng

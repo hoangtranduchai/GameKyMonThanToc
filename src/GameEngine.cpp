@@ -5,6 +5,7 @@
 #include "ThienCoEngine.h"
 #include <string>
 #include "SoundManager.h"
+#include "ParticleSystem.h"
 
 // Khởi tạo biến static instance
 GameEngine* GameEngine::s_Instance = nullptr;
@@ -178,7 +179,7 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     // --- [AAA SYSTEM] NẠP SPRITE SHEET PLAYER ---
     // Định nghĩa các hành động và hướng tương ứng với tên file ảnh
-    std::string actions[] = {"idle", "run", "attack1", "attack2"};
+    std::string actions[] = {"idle", "run"};
     std::string directions[] = {"down", "left", "right", "up"};
     
     // Vòng lặp tự động nạp tất cả ảnh
@@ -362,6 +363,8 @@ void GameEngine::Update() {
         m_blinkTimer += m_deltaTime;
         if (m_blinkTimer > 1.0f) m_blinkTimer = 0.0f;
     }
+
+    ParticleSystem::GetInstance()->Update(m_deltaTime);
 }
 
 void GameEngine::OnPlayerMove() {
@@ -415,6 +418,21 @@ void GameEngine::OnShrineVisited(int row, int col) {
     
     // Phát hiệu ứng âm thanh khi khai mở Trận Nhãn
     SoundManager::GetInstance()->PlaySFX("collect");
+
+    // --- KÍCH HOẠT HIỆU ỨNG NĂNG LƯỢNG (AAA MOMENT) ---
+    int tileSize = m_pMap->GetTileSize();
+    // Tính tâm của ô Trận Nhãn
+    int centerX = col * tileSize + tileSize / 2;
+    int centerY = row * tileSize + tileSize / 2;
+    
+    // Màu xanh ngọc (Cyan) rực rỡ giống vũ khí nhân vật
+    SDL_Color magicColor = {0, 255, 255, 255}; 
+    
+    // Bắn ra 500 hạt năng lượng
+    ParticleSystem::GetInstance()->Emit(centerX, centerY, 500, magicColor);
+    
+    // Có thể thêm màu vàng kim loại (Gold) xen kẽ
+    ParticleSystem::GetInstance()->Emit(centerX, centerY, 200, {255, 215, 0, 255});
     
     std::cout << ">>> DA KHAI MO TRAN NHAN! (" << m_shrinesCollected << "/" << m_totalShrines << ")" << std::endl;
 
@@ -433,6 +451,10 @@ void GameEngine::Render() {
     // Lấy kích thước màn hình logic
     int w = m_pMap->GetMapPixelWidth();
     int h = m_pMap->GetMapPixelHeight();
+
+    // --- VẼ HIỆU ỨNG HẠT (VFX) ---
+    ParticleSystem::GetInstance()->Render(m_pRenderer);
+
     SDL_Color gold = {255, 215, 0, 255};
     SDL_Color white = {255, 255, 255, 255};
     
@@ -453,10 +475,16 @@ void GameEngine::Render() {
         }
 
         case STATE_PLAY: {
+            // 1. Vẽ Map
             if (m_pMap) m_pMap->DrawMap();
+
+            // 2. Vẽ Player
             if (m_pPlayer) m_pPlayer->Draw();
             
-            // Vẽ HUD
+            // 3. Vẽ Hạt (VFX)
+            ParticleSystem::GetInstance()->Render(m_pRenderer);
+            
+            // 4. Vẽ HUD
             // --- VẼ HUD (GIAO DIỆN NGƯỜI DÙNG) ---
             // Màu chữ: Trắng sáng (hoặc Vàng kim loại cho sang trọng)
             SDL_Color textColor = {255, 215, 0, 255}; // Gold Color
@@ -475,8 +503,10 @@ void GameEngine::Render() {
 
         case STATE_WIN: {
             // Vẽ Map và Player đứng yên làm nền
+            // (Giữ nguyên thứ tự Map -> Player -> VFX -> UI)
             if (m_pMap) m_pMap->DrawMap();
             if (m_pPlayer) m_pPlayer->Draw();
+            ParticleSystem::GetInstance()->Render(m_pRenderer);
 
             // Vẽ bảng chiến thắng
             TextureManager::GetInstance()->DrawText("gui_font", "THIEN MENH HOAN TAT!", w/2 - 300, h/3, gold, m_pRenderer);

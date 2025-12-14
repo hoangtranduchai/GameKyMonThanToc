@@ -53,24 +53,24 @@ void TextureManager::DrawFrame(std::string id, int x, int y, int width, int heig
     SDL_Rect srcRect;
     SDL_Rect destRect;
 
-    // 1. Tính toán phần ảnh CẮT từ Sprite Sheet (GIỮ NGUYÊN)
+    // 1. Tính toán phần ảnh CẮT từ Sprite Sheet (Kích thước gốc)
     // Đây là kích thước thật trong file ảnh
     srcRect.x = width * currentFrame;
     srcRect.y = height * (currentRow - 1);
     srcRect.w = width;
     srcRect.h = height;
     
-    // 2. Tính toán phần ảnh VẼ ra màn hình (THAY ĐỔI)
-    // Đây là kích thước hiển thị sau khi phóng to
+    // 2. Tính toán phần ảnh VẼ ra màn hình (Scale nhân vật)
+    // TÍNH TOÁN THEO SCALE: Kích thước đích = Kích thước gốc * Tỷ lệ
     destRect.w = (int)(width * scale);
     destRect.h = (int)(height * scale);
 
-    // 3. Căn chỉnh vị trí (Centering Logic AAA)
-    // Khi phóng to, chúng ta muốn nhân vật đứng giữa ô, chứ không phải lệch sang phải/dưới.
-    // Tuy nhiên, để đơn giản và linh hoạt, ta cứ vẽ tại x, y. 
-    // Việc căn giữa sẽ do lớp Player tính toán.
+    // 3. Vị trí vẽ
     destRect.x = x;
     destRect.y = y;
+
+    // Đảm bảo không vẽ ảnh chưa load
+    if (m_textureMap[id] == nullptr) return;
 
     SDL_RenderCopyEx(pRenderer, m_textureMap[id], &srcRect, &destRect, 0, 0, flip);
 }
