@@ -24,6 +24,13 @@ public:
     // Trả về: 0 (Đất - Đi được), 1 (Núi - Chặn), 2 (Trận Nhãn - Đi được)
     int GetTileID(int row, int col);
 
+    // Cho phép thay đổi loại Tile tại vị trí cụ thể (dùng khi ăn Trận Nhãn hoặc Undo)
+    void SetTileID(int row, int col, int id) {
+        if (row >= 0 && row < m_rows && col >= 0 && col < m_cols) {
+            m_mapLayer[row][col] = id;
+        }
+    }
+
     // Getter kích thước bản đồ
     int GetRows() const {
         return m_rows;
@@ -48,7 +55,7 @@ public:
         return m_rows * m_tileSize;
     }
 
-    // Lấy tọa độ điểm xuất phát (1,1 theo đề bài)
+    // Lấy tọa độ điểm xuất phát (0, 0)
     MapPoint GetStartPoint() const {
         return m_startPoint;
     }

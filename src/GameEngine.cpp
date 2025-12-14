@@ -182,17 +182,96 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     return true;
 }
 
+// --- 1. HÀM LƯU TRẠNG THÁI (GỌI TRƯỚC KHI DI CHUYỂN) ---
+void GameEngine::SaveState() {
+    GameStateMoment moment;
+    
+    // Lưu tọa độ Grid của Player (Chính xác tuyệt đối)
+    int tileSize = m_pMap->GetTileSize();
+    moment.playerGridRow = m_pPlayer->GetY() / tileSize;
+    moment.playerGridCol = m_pPlayer->GetX() / tileSize;
+    
+    // Lưu các chỉ số Gameplay
+    moment.currentSteps = m_currentSteps;
+    moment.shrinesCollected = m_shrinesCollected;
+    
+    // Lưu bản sao danh sách các Trận Nhãn đã ăn
+    moment.visitedShrinesSnapshot = m_visitedShrinesList;
+
+    // Đẩy vào ngăn xếp
+    m_historyStack.push(moment);
+    
+    // TỐI ƯU HÓA BỘ NHỚ AAA:
+    // Giới hạn lịch sử Undo là 100 bước để tránh tốn RAM vô ích
+    // (Mặc dù stack mặc định không có hàm xóa đáy, nhưng với struct nhỏ này 
+    // thì 1000 bước cũng chỉ tốn vài chục KB, nên ta có thể bỏ qua việc xóa đáy 
+    // để giữ hiệu năng cao nhất, không cần dùng Deque).
+}
+
+// --- 2. HÀM UNDO (QUAY NGƯỢC THỜI GIAN) ---
+void GameEngine::Undo() {
+    // 1. Kiểm tra an toàn
+    if (m_historyStack.empty()) {
+        std::cout << "[Thong bao] Khong the Hoi Tuong ve qua khu xa hon!" << std::endl;
+        return;
+    }
+
+    // 2. Lấy trạng thái từ đỉnh Stack (Snapshot)
+    // Dùng tham chiếu (reference) để tránh copy dữ liệu, tối ưu hiệu năng
+    const GameStateMoment& moment = m_historyStack.top();
+
+    // 3. TÁI TẠO BẢN ĐỒ THÔNG MINH (SMART RECONSTRUCTION - O(1))
+    // Logic: Nếu số lượng Shrine hiện tại nhiều hơn trong quá khứ,
+    // nghĩa là bước đi vừa rồi đã ăn mất 1 Shrine.
+    // Vị trí Shrine đó chính là vị trí HIỆN TẠI của Player (trước khi lùi lại).
+    if (m_shrinesCollected > moment.shrinesCollected) {
+        int tileSize = m_pMap->GetTileSize();
+        
+        // Tính vị trí Grid hiện tại của Player (nơi vừa ăn Shrine)
+        int currentGridRow = m_pPlayer->GetY() / tileSize;
+        int currentGridCol = m_pPlayer->GetX() / tileSize;
+        
+        // Hồi sinh Shrine tại đúng vị trí này (Set ID = 2)
+        // Không cần duyệt mảng, không cần tìm kiếm -> O(1) tuyệt đối
+        m_pMap->SetTileID(currentGridRow, currentGridCol, 2);
+    }
+
+    // 4. Khôi phục Vị trí Player (Teleport về quá khứ)
+    int tileSize = m_pMap->GetTileSize();
+    int restoreX = moment.playerGridCol * tileSize;
+    int restoreY = moment.playerGridRow * tileSize;
+    
+    if (m_pPlayer) {
+        // Hàm này sẽ reset cả cooldown di chuyển để gameplay mượt mà
+        m_pPlayer->SetPosition(restoreX, restoreY);
+    }
+
+    // 5. Khôi phục dữ liệu Gameplay
+    m_currentSteps = moment.currentSteps;
+    m_shrinesCollected = moment.shrinesCollected;
+    
+    // Copy lại danh sách đã ăn (Vector assignment cũng được tối ưu rất tốt trong C++)
+    m_visitedShrinesList = moment.visitedShrinesSnapshot;
+
+    // 6. Xóa trạng thái vừa dùng khỏi Stack
+    m_historyStack.pop();
+
+    std::cout << "<<< HOI TUONG THANH CONG! (Buoc: " << m_currentSteps << ") <<<" << std::endl;
+}
+
 // Xử lý sự kiện
 void GameEngine::HandleEvents() {
     SDL_Event event;
     // Xử lý tất cả các sự kiện trong hàng đợi
     while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_QUIT) {
+        if (event.type == SDL_QUIT
+            || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_q)) {
             m_bRunning = false;
         }
-        
-        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-            m_bRunning = false;
+
+        // --- KÍCH HOẠT UNDO BẰNG PHÍM U ---
+        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_u) {
+            Undo();
         }
     }
 }
@@ -230,6 +309,11 @@ void GameEngine::OnShrineVisited(int row, int col) {
     // Đánh dấu đã mở
     m_visitedShrinesList.push_back({row, col});
     m_shrinesCollected++;
+
+    // --- HIỆU ỨNG HÌNH ẢNH AAA ---
+    // Khi ăn xong, biến Trận Nhãn (ID 2) thành Đất Thường (ID 0)
+    // Để người chơi thấy Trận Nhãn "biến mất" hoặc "tắt sáng"
+    m_pMap->SetTileID(row, col, 0);
     
     std::cout << ">>> DA KHAI MO TRAN NHAN! (" << m_shrinesCollected << "/" << m_totalShrines << ")" << std::endl;
 

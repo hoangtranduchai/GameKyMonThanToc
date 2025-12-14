@@ -74,6 +74,9 @@ void Player::HandleInput() {
         int nextTileID = pMap->GetTileID(nextRow, nextCol);
         
         if (nextTileID != 1) { 
+            // --- LƯU TRẠNG THÁI TRƯỚC KHI ĐI ---
+            GameEngine::GetInstance()->SaveState();
+
             // Cập nhật tọa độ
             m_x = nextCol * tileSize;
             m_y = nextRow * tileSize;
@@ -84,6 +87,8 @@ void Player::HandleInput() {
             GameEngine::GetInstance()->OnPlayerMove();
 
             // 2. Báo cáo nếu gặp Trận Nhãn
+            // Kiểm tra Trận Nhãn
+            // Lưu ý: Lúc này Tile vẫn là 2. Sau khi gọi OnShrineVisited nó mới biến thành 0.
             if (nextTileID == 2) {
                 GameEngine::GetInstance()->OnShrineVisited(nextRow, nextCol);
                 // Sau này sẽ thêm code phát âm thanh hoặc hiệu ứng tại đây

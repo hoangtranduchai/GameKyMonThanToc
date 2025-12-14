@@ -7,10 +7,25 @@
 #include <vector>
 #include "TextureManager.h"
 #include "Map.h"
+#include <stack>
+#include <utility>
 
 // Forward Declaration để tránh lỗi vòng lặp include
 class IGameState;
 class Player;
+
+// Cấu trúc Snapshot: Lưu giữ khoảnh khắc lịch sử
+// Được tối ưu hóa bộ nhớ, chỉ lưu những gì cần thiết
+struct GameStateMoment {
+    int playerGridRow;       // Vị trí dòng của Player
+    int playerGridCol;       // Vị trí cột của Player
+    int currentSteps;        // Số bước chân
+    int shrinesCollected;    // Số lượng đã thu thập
+    
+    // Danh sách tọa độ các Trận Nhãn ĐÃ MỞ tại thời điểm này
+    // Dùng vector nhỏ (N <= 15) nên copy rất nhanh, an toàn hơn con trỏ
+    std::vector<std::pair<int, int>> visitedShrinesSnapshot;
+};
 
 class GameEngine {
 public:
@@ -81,6 +96,10 @@ public:
         return m_totalShrines;
     }
 
+    // --- HỆ THỐNG HỒI TƯỞNG (UNDO) ---
+    void SaveState(); // Chụp ảnh trạng thái hiện tại
+    void Undo();      // Quay ngược thời gian
+
 private:
     // Private constructor cho Singleton
     GameEngine();
@@ -118,4 +137,7 @@ private:
     
     // Danh sách các vị trí Trận Nhãn đã mở (để không tính điểm 2 lần)
     std::vector<std::pair<int, int>> m_visitedShrinesList;
+
+    // Ngăn xếp lịch sử (Stack)
+    std::stack<GameStateMoment> m_historyStack;
 };

@@ -14,6 +14,14 @@ public:
     virtual void Update();
     virtual void Clean();
 
+    // Hàm teleport dùng cho Undo
+    void SetPosition(int x, int y) {
+        m_x = x;
+        m_y = y;
+        // Reset thời gian di chuyển để người chơi có thể đi tiếp ngay lập tức
+        m_lastMoveTime = SDL_GetTicks() - MOVE_DELAY; 
+    }
+
 private:
     // Hàm xử lý input riêng cho Player
     void HandleInput();
