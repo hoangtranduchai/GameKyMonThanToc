@@ -4,6 +4,7 @@
 #include "TextureManager.h"
 #include "ThienCoEngine.h"
 #include <string>
+#include "SoundManager.h"
 
 // Khởi tạo biến static instance
 GameEngine* GameEngine::s_Instance = nullptr;
@@ -132,6 +133,22 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     } else {
         std::cout << "[He thong] Da kich hoat Auto-Scale cho map: " << mapRealW << "x" << mapRealH << std::endl;
     }
+
+    // --- KHỞI TẠO ÂM THANH AAA ---
+    // Load Music
+    std::string bgmPath = std::string(PROJECT_ROOT_PATH) + "/assets/audio/bgm.mp3";
+    SoundManager::GetInstance()->LoadMusic(bgmPath, "bgm");
+    SoundManager::GetInstance()->SetMusicVolume(64);  // 50% volume
+
+    // Load SFX
+    std::string stepPath = std::string(PROJECT_ROOT_PATH) + "/assets/audio/step.wav";
+    SoundManager::GetInstance()->LoadSFX(stepPath, "step");
+
+    std::string collectPath = std::string(PROJECT_ROOT_PATH) + "/assets/audio/collect.wav";
+    SoundManager::GetInstance()->LoadSFX(collectPath, "collect");
+
+    // Phát nhạc nền ngay lập tức (Lặp vô tận)
+    SoundManager::GetInstance()->PlayMusic("bgm");
 
     // --- KÍCH HOẠT THIÊN CƠ (AI) ---
     // Tính toán ngay lập tức ma trận khoảng cách và Thiên Mệnh
@@ -297,7 +314,8 @@ void GameEngine::Update() {
 
 void GameEngine::OnPlayerMove() {
     m_currentSteps++;
-    // Có thể thêm âm thanh bước chân tại đây
+    // Phát tiếng bước chân
+    SoundManager::GetInstance()->PlaySFX("step");
 }
 
 void GameEngine::OnShrineVisited(int row, int col) {
@@ -314,6 +332,9 @@ void GameEngine::OnShrineVisited(int row, int col) {
     // Khi ăn xong, biến Trận Nhãn (ID 2) thành Đất Thường (ID 0)
     // Để người chơi thấy Trận Nhãn "biến mất" hoặc "tắt sáng"
     m_pMap->SetTileID(row, col, 0);
+    
+    // Phát hiệu ứng âm thanh khi khai mở Trận Nhãn
+    SoundManager::GetInstance()->PlaySFX("collect");
     
     std::cout << ">>> DA KHAI MO TRAN NHAN! (" << m_shrinesCollected << "/" << m_totalShrines << ")" << std::endl;
 
@@ -353,6 +374,20 @@ void GameEngine::Render() {
     TextureManager::GetInstance()->DrawText("gui_font", stepText, margin, margin, textColor, m_pRenderer);
     TextureManager::GetInstance()->DrawText("gui_font", shrineText, margin, margin * 3, textColor, m_pRenderer);
     
+    // --- HIỆU ỨNG CHIẾN THẮNG ---
+    if (m_shrinesCollected >= m_totalShrines) {
+        // Màu Vàng Kim loại sáng rực
+        SDL_Color winColor = {255, 223, 0, 255}; 
+        
+        // Tính vị trí giữa màn hình (nhờ Logical Size nên tọa độ này rất lớn)
+        int mapW = m_pMap->GetMapPixelWidth();
+        int mapH = m_pMap->GetMapPixelHeight();
+        
+        // Vẽ chữ "THIEN MENH HOAN TAT" ở chính giữa
+        // Lưu ý: Cần load thêm một font size cực lớn (Title Font) trong Init nếu muốn đẹp hơn
+        TextureManager::GetInstance()->DrawText("gui_font", "THIEN MENH HOAN TAT!", mapW / 2 - 200, mapH / 2, winColor, m_pRenderer);
+    }
+
     SDL_RenderPresent(m_pRenderer);
 }
 
