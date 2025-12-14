@@ -14,6 +14,13 @@
 class IGameState;
 class Player;
 
+// Định nghĩa các giai đoạn của một kiệt tác
+enum GameState {
+    STATE_MENU,     // Màn hình chờ: Nơi cảm xúc bắt đầu
+    STATE_PLAY,     // Màn hình chơi: Nơi trí tuệ thăng hoa
+    STATE_WIN       // Màn hình thắng: Nơi vinh quang tỏa sáng
+};
+
 // Cấu trúc Snapshot: Lưu giữ khoảnh khắc lịch sử
 // Được tối ưu hóa bộ nhớ, chỉ lưu những gì cần thiết
 struct GameStateMoment {
@@ -100,6 +107,9 @@ public:
     void SaveState(); // Chụp ảnh trạng thái hiện tại
     void Undo();      // Quay ngược thời gian
 
+    // Hàm Reset game để chơi lại từ đầu
+    void ResetGame();
+
 private:
     // Private constructor cho Singleton
     GameEngine();
@@ -140,4 +150,10 @@ private:
 
     // Ngăn xếp lịch sử (Stack)
     std::stack<GameStateMoment> m_historyStack;
+
+    // Biến lưu trạng thái hiện tại
+    GameState m_currentState;
+    
+    // Biến hiệu ứng nhấp nháy cho text "Press Enter"
+    float m_blinkTimer;
 };

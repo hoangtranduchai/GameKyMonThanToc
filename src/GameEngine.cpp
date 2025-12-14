@@ -36,6 +36,8 @@ GameEngine::GameEngine() {
     m_currentSteps = 0;
     m_shrinesCollected = 0;
     m_totalShrines = 0;
+    m_currentState = STATE_MENU; // Bắt đầu ở Menu
+    m_blinkTimer = 0.0f;
 }
 
 GameEngine::~GameEngine() {
@@ -99,9 +101,7 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     // Load Background
     std::string bgPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/background.png";
-    if (!TextureManager::GetInstance()->Load(bgPath, "background", m_pRenderer)) {
-        return false; 
-    }
+    if (!TextureManager::GetInstance()->Load(bgPath, "background", m_pRenderer)) return false;
 
     // Load Tileset Image
     std::string tilePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/tiles.png";
@@ -146,6 +146,9 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     std::string collectPath = std::string(PROJECT_ROOT_PATH) + "/assets/audio/collect.wav";
     SoundManager::GetInstance()->LoadSFX(collectPath, "collect");
+
+    std::string winSoundPath = std::string(PROJECT_ROOT_PATH) + "/assets/audio/win.wav";
+    SoundManager::GetInstance()->LoadSFX(winSoundPath, "win_sound");
 
     // Phát nhạc nền ngay lập tức (Lặp vô tận)
     SoundManager::GetInstance()->PlayMusic("bgm");
@@ -286,9 +289,34 @@ void GameEngine::HandleEvents() {
             m_bRunning = false;
         }
 
-        // --- KÍCH HOẠT UNDO BẰNG PHÍM U ---
-        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_u) {
-            Undo();
+        // --- XỬ LÝ THEO TRẠNG THÁI ---
+        switch (m_currentState) {
+            case STATE_MENU:
+                // Nhấn ENTER để BẮT ĐẦU
+                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN) {
+                    m_currentState = STATE_PLAY;
+                    SoundManager::GetInstance()->PlaySFX("collect"); // Tiếng xác nhận
+                    // Bắt đầu nhạc nền game
+                    SoundManager::GetInstance()->PlayMusic("bgm");
+                }
+                break;
+
+            case STATE_PLAY:
+                // Các phím điều khiển nhân vật chỉ hoạt động ở đây
+                if (event.type == SDL_KEYDOWN) {
+                    // Undo
+                    if (event.key.keysym.sym == SDLK_u) Undo();
+                    // Di chuyển (đã xử lý trong Player::HandleInput gọi ở Update, 
+                    // nhưng Player chỉ nên nhận input khi ở State Play)
+                }
+                break;
+
+            case STATE_WIN:
+                // Nhấn R để CHƠI LẠI (Replay)
+                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r) {
+                    ResetGame();
+                }
+                break;
         }
     }
 }
@@ -306,9 +334,15 @@ void GameEngine::Update() {
         m_deltaTime = 0.05f;
     }
     
-    // Cập nhật Player
-    if (m_pPlayer) {
-        m_pPlayer->Update();
+    // Chỉ update nhân vật khi đang CHƠI
+    if (m_currentState == STATE_PLAY) {
+        if (m_pPlayer) m_pPlayer->Update();
+    }
+
+    // Hiệu ứng nhấp nháy cho Menu và Win screen
+    if (m_currentState != STATE_PLAY) {
+        m_blinkTimer += m_deltaTime;
+        if (m_blinkTimer > 1.0f) m_blinkTimer = 0.0f;
     }
 }
 
@@ -316,6 +350,34 @@ void GameEngine::OnPlayerMove() {
     m_currentSteps++;
     // Phát tiếng bước chân
     SoundManager::GetInstance()->PlaySFX("step");
+}
+
+void GameEngine::ResetGame() {
+    // 1. Reset thông số gameplay
+    m_currentSteps = 0;
+    m_shrinesCollected = 0;
+    m_visitedShrinesList.clear();
+    
+    // 2. Xóa lịch sử Undo
+    while (!m_historyStack.empty()) {
+        m_historyStack.pop();
+    }
+
+    // 3. Reset Player về vị trí xuất phát
+    MapPoint startPos = m_pMap->GetStartPoint();
+    int tileSize = m_pMap->GetTileSize();
+    m_pPlayer->SetPosition(startPos.col * tileSize, startPos.row * tileSize);
+
+    // 4. Khôi phục toàn bộ Map (Vẽ lại tất cả Shrine)
+    const std::vector<MapPoint>& shrines = m_pMap->GetShrines();
+    for (const auto& s : shrines) {
+        m_pMap->SetTileID(s.row, s.col, 2); // 2 = Shrine ID
+    }
+
+    // 5. Chuyển về trạng thái Menu hoặc Play
+    m_currentState = STATE_PLAY; // Hoặc STATE_MENU nếu muốn về menu
+    
+    std::cout << "[He thong] Game da duoc Reset!" << std::endl;
 }
 
 void GameEngine::OnShrineVisited(int row, int col) {
@@ -340,8 +402,8 @@ void GameEngine::OnShrineVisited(int row, int col) {
 
     // Kiểm tra Chiến Thắng
     if (m_shrinesCollected >= m_totalShrines) {
-        std::cout << "!!! CHUC MUNG - BAN DA HOAN THANH THIEN MENH !!!" << std::endl;
-        // Logic Pause game hoặc hiện màn hình Win sẽ làm sau
+        m_currentState = STATE_WIN; // <--- CHUYỂN TRẠNG THÁI
+        SoundManager::GetInstance()->PlaySFX("win_sound"); // Nếu có
     }
 }
 
@@ -349,43 +411,71 @@ void GameEngine::OnShrineVisited(int row, int col) {
 void GameEngine::Render() {
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(m_pRenderer);
-    
-    // Vẽ Map (Vẽ tại tọa độ gốc 0,0 vì Logical Size đã lo việc hiển thị)
-    if (m_pMap) {
-        m_pMap->DrawMap(); 
-    }
 
-    // Vẽ Player
-    if (m_pPlayer) {
-        m_pPlayer->Draw();
-    }
+    // Lấy kích thước màn hình logic
+    int w = m_pMap->GetMapPixelWidth();
+    int h = m_pMap->GetMapPixelHeight();
+    SDL_Color gold = {255, 215, 0, 255};
+    SDL_Color white = {255, 255, 255, 255};
     
-    // --- VẼ HUD (GIAO DIỆN NGƯỜI DÙNG) ---
-    // Màu chữ: Trắng sáng (hoặc Vàng kim loại cho sang trọng)
-    SDL_Color textColor = {255, 215, 0, 255}; // Gold Color
+    switch (m_currentState) {
+        case STATE_MENU: {
+            // 1. Vẽ Background mờ ảo (có thể vẽ Map làm nền)
+            if (m_pMap) m_pMap->DrawMap();
+            
+            // 2. Vẽ Tiêu Đề Lớn "KỲ MÔN THẦN TỐC"
+            // (Bạn nên tạo font size lớn hơn trong Init cho đẹp)
+            TextureManager::GetInstance()->DrawText("gui_font", "KY MON THAN TOC", w/2 - 300, h/3, gold, m_pRenderer);
+            
+            // 3. Vẽ dòng chữ nhấp nháy
+            if (m_blinkTimer < 0.5f) {
+                TextureManager::GetInstance()->DrawText("gui_font", "Nhan ENTER de Nhap The", w/2 - 250, h/2, white, m_pRenderer);
+            }
+            break;
+        }
 
-    // Chuẩn bị nội dung text
-    std::string stepText = "Buoc: " + std::to_string(m_currentSteps) + " / " + std::to_string(m_optimalSteps);
-    std::string shrineText = "Tran Nhan: " + std::to_string(m_shrinesCollected) + " / " + std::to_string(m_totalShrines);
+        case STATE_PLAY: {
+            if (m_pMap) m_pMap->DrawMap();
+            if (m_pPlayer) m_pPlayer->Draw();
+            
+            // Vẽ HUD
+            // --- VẼ HUD (GIAO DIỆN NGƯỜI DÙNG) ---
+            // Màu chữ: Trắng sáng (hoặc Vàng kim loại cho sang trọng)
+            SDL_Color textColor = {255, 215, 0, 255}; // Gold Color
 
-    // Lấy kích thước Map để căn chỉnh vị trí (Vẽ ở góc trên trái)
-    int margin = m_pMap->GetMapPixelHeight() / 30;
-    
-    TextureManager::GetInstance()->DrawText("gui_font", stepText, margin, margin, textColor, m_pRenderer);
-    TextureManager::GetInstance()->DrawText("gui_font", shrineText, margin, margin * 3, textColor, m_pRenderer);
-    
-    // --- HIỆU ỨNG CHIẾN THẮNG ---
-    if (m_shrinesCollected >= m_totalShrines) {
-        // Màu Vàng Kim loại sáng rực
-        SDL_Color winColor = {255, 223, 0, 255}; 
-        
-        // Tính vị trí giữa màn hình (nhờ Logical Size nên tọa độ này rất lớn)
-        int mapW = m_pMap->GetMapPixelWidth();
-        int mapH = m_pMap->GetMapPixelHeight();
-        
-        // Vẽ chữ "THIEN MENH HOAN TAT" ở chính giữa
-        // Lưu ý: Cần load thêm một font size cực lớn (Title Font) trong Init nếu muốn đẹp hơn
-        TextureManager::GetInstance()->DrawText("gui_font", "THIEN MENH HOAN TAT!", mapW / 2 - 200, mapH / 2, winColor, m_pRenderer);
+            // Chuẩn bị nội dung text
+            std::string stepText = "Buoc: " + std::to_string(m_currentSteps) + " / " + std::to_string(m_optimalSteps);
+            std::string shrineText = "Tran Nhan: " + std::to_string(m_shrinesCollected) + " / " + std::to_string(m_totalShrines);
+
+            // Lấy kích thước Map để căn chỉnh vị trí (Vẽ ở góc trên trái)
+            int margin = m_pMap->GetMapPixelHeight() / 30;
+            
+            TextureManager::GetInstance()->DrawText("gui_font", stepText, margin, margin, textColor, m_pRenderer);
+            TextureManager::GetInstance()->DrawText("gui_font", shrineText, margin, margin * 3, textColor, m_pRenderer);
+
+            {
+                std::string stepText = "Buoc: " + std::to_string(m_currentSteps) + " / " + std::to_string(m_optimalSteps);
+                TextureManager::GetInstance()->DrawText("gui_font", stepText, 50, 50, gold, m_pRenderer);
+            }
+            break;
+        }
+
+        case STATE_WIN: {
+            // Vẽ Map và Player đứng yên làm nền
+            if (m_pMap) m_pMap->DrawMap();
+            if (m_pPlayer) m_pPlayer->Draw();
+
+            // Vẽ bảng chiến thắng
+            TextureManager::GetInstance()->DrawText("gui_font", "THIEN MENH HOAN TAT!", w/2 - 300, h/3, gold, m_pRenderer);
+            
+            std::string resultStr = "Thanh tich: " + std::to_string(m_currentSteps) + " buoc";
+            TextureManager::GetInstance()->DrawText("gui_font", resultStr, w/2 - 200, h/2, white, m_pRenderer);
+
+            if (m_blinkTimer < 0.5f) {
+                TextureManager::GetInstance()->DrawText("gui_font", "Nhan 'R' de Choi Lai", w/2 - 220, h/2 + 150, white, m_pRenderer);
+            }
+            break;
+        }
     }
 
     SDL_RenderPresent(m_pRenderer);
