@@ -176,24 +176,42 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Ở đây tôi giả định bạn sẽ làm việc đó.
     TextureManager::GetInstance()->LoadFont(fontPath, "gui_font", fontSize);
 
-    // Load Player Texture
-    std::string playerPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png";
-    if (!TextureManager::GetInstance()->Load(playerPath, "player", m_pRenderer)) {
-        return false;
+    // --- [AAA SYSTEM] NẠP SPRITE SHEET PLAYER ---
+    // Định nghĩa các hành động và hướng tương ứng với tên file ảnh
+    std::string actions[] = {"idle", "run", "attack1", "attack2"};
+    std::string directions[] = {"down", "left", "right", "up"};
+    
+    // Vòng lặp tự động nạp tất cả ảnh
+    for (const auto& act : actions) {
+        for (const auto& dir : directions) {
+            // Xây dựng đường dẫn file: assets/images/player/[ACTION]/[action]_[dir].png
+            
+            // Ví dụ path: assets/images/player/idle/idle_down.png
+            std::string folderName = act; // idle, run, attack1...
+            std::string fileName = act + "_" + dir + ".png";
+            
+            std::string fullPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player/" + folderName + "/" + fileName;
+            
+            // ID trong TextureManager: "player_idle_down", "player_run_left"...
+            std::string textureID = "player_" + act + "_" + dir;
+            
+            if (!TextureManager::GetInstance()->Load(fullPath, textureID, m_pRenderer)) {
+                std::cout << "[Canh bao] Khong tim thay: " << fullPath << std::endl;
+            }
+        }
     }
 
-    // --- CẬP NHẬT AAA: SPAWN THEO DỮ LIỆU MAP ---
-    int targetPlayerW = 938; // Kích thước hiển thị Player (bằng TileSize)
-    int targetPlayerH = 938;
+    // --- KHỞI TẠO PLAYER ---
+    // Lưu ý: TextureID ban đầu là "player_idle_down"
+    // Kích thước frame cần đo chính xác từ ảnh (Ví dụ ảnh RUN 8 frame rộng 5120px -> 1 frame = 640px)
+    int frameW = 96;
+    int frameH = 80;
 
-    // Lấy điểm xuất phát từ Map (thay vì số cứng)
     MapPoint startPos = m_pMap->GetStartPoint();
     int tileSize = m_pMap->GetTileSize();
 
-    int spawnX = startPos.col * tileSize;
-    int spawnY = startPos.row * tileSize;
-
-    m_pPlayer = new Player(new LoaderParams(spawnX, spawnY, targetPlayerW, targetPlayerH, "player"));
+    // Tạo Player tại vị trí bắt đầu
+    m_pPlayer = new Player(new LoaderParams(startPos.col * tileSize, startPos.row * tileSize, frameW, frameH, "player_idle_down"));
 
     std::cout << "Player spawned at Grid [" << startPos.row << "," << startPos.col << "]" << std::endl;
 
@@ -452,11 +470,6 @@ void GameEngine::Render() {
             
             TextureManager::GetInstance()->DrawText("gui_font", stepText, margin, margin, textColor, m_pRenderer);
             TextureManager::GetInstance()->DrawText("gui_font", shrineText, margin, margin * 3, textColor, m_pRenderer);
-
-            {
-                std::string stepText = "Buoc: " + std::to_string(m_currentSteps) + " / " + std::to_string(m_optimalSteps);
-                TextureManager::GetInstance()->DrawText("gui_font", stepText, 50, 50, gold, m_pRenderer);
-            }
             break;
         }
 

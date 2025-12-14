@@ -15,7 +15,7 @@ public:
 
     // Vẽ một phần ảnh (DrawFrame - dùng cho nhân vật có Animation sau này)
     // Hiện tại chúng ta dùng nó để vẽ Player mượt mà hơn
-    void DrawFrame(std::string id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer, SDL_RendererFlip flip = SDL_FLIP_NONE);
+    void DrawFrame(std::string id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer, double scale = 1.0, SDL_RendererFlip flip = SDL_FLIP_NONE);
     
     // Xóa một texture cụ thể khỏi bộ nhớ
     void Drop(std::string id);

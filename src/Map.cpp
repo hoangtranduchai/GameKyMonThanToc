@@ -9,7 +9,7 @@ Map::Map() {
     m_rows = 0;
     m_cols = 0;
     m_numShrines = 0;
-    m_tileSize = 938;
+    m_tileSize = 640;
 }
 
 Map::~Map() {

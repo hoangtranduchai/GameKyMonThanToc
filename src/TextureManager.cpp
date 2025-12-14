@@ -49,27 +49,28 @@ void TextureManager::Draw(std::string id, int x, int y, int width, int height, S
 }
 
 // Hàm vẽ Frame (cho Player, Animation)
-void TextureManager::DrawFrame(std::string id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer, SDL_RendererFlip flip) {
+void TextureManager::DrawFrame(std::string id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer, double scale, SDL_RendererFlip flip) {
     SDL_Rect srcRect;
     SDL_Rect destRect;
 
-    // Tính toán phần ảnh cần cắt (sprite sheet logic)
-    // Hiện tại Player là ảnh tĩnh, nên ta có thể để mặc định
+    // 1. Tính toán phần ảnh CẮT từ Sprite Sheet (GIỮ NGUYÊN)
+    // Đây là kích thước thật trong file ảnh
     srcRect.x = width * currentFrame;
     srcRect.y = height * (currentRow - 1);
     srcRect.w = width;
     srcRect.h = height;
     
-    // Nếu là ảnh đơn (không phải sprite sheet), query lại kích thước thật
-    if (width == 0 || height == 0) {
-       SDL_QueryTexture(m_textureMap[id], NULL, NULL, &srcRect.w, &srcRect.h);
-       srcRect.x = 0; srcRect.y = 0;
-    }
+    // 2. Tính toán phần ảnh VẼ ra màn hình (THAY ĐỔI)
+    // Đây là kích thước hiển thị sau khi phóng to
+    destRect.w = (int)(width * scale);
+    destRect.h = (int)(height * scale);
 
+    // 3. Căn chỉnh vị trí (Centering Logic AAA)
+    // Khi phóng to, chúng ta muốn nhân vật đứng giữa ô, chứ không phải lệch sang phải/dưới.
+    // Tuy nhiên, để đơn giản và linh hoạt, ta cứ vẽ tại x, y. 
+    // Việc căn giữa sẽ do lớp Player tính toán.
     destRect.x = x;
     destRect.y = y;
-    destRect.w = (width > 0) ? width : srcRect.w; // Nếu width truyền vào là 0 thì dùng kích thước gốc
-    destRect.h = (height > 0) ? height : srcRect.h;
 
     SDL_RenderCopyEx(pRenderer, m_textureMap[id], &srcRect, &destRect, 0, 0, flip);
 }
