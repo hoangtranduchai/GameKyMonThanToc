@@ -29,11 +29,16 @@ void Map::LoadMap(std::string path) {
         return;
     }
 
-    // Resize vector động theo kích thước R x C
-    m_mapLayer.resize(m_rows, std::vector<int>(m_cols));
+    // Resize vector động theo kích thước R x C (preallocate rows)
+    m_mapLayer.clear();
+    m_mapLayer.reserve(m_rows);
+    for (int i = 0; i < m_rows; ++i) {
+        m_mapLayer.emplace_back(std::vector<int>(m_cols));
+    }
 
-    // Xóa dữ liệu cũ nếu có
+    // Xóa dữ liệu cũ nếu có và preallocate shrines list
     m_shrines.clear();
+    if (m_numShrines > 0) m_shrines.reserve(m_numShrines);
 
     // Đọc lưới ký tự
     char tileChar;
@@ -83,14 +88,18 @@ int Map::GetTileID(int row, int col) {
 }
 
 void Map::DrawMap() {
+    // Cache renderer and texture manager to reduce repeated GetInstance calls
+    auto* texMgr = TextureManager::GetInstance();
+    auto* renderer = GameEngine::GetInstance()->GetRenderer();
+    
     for (int row = 0; row < m_rows; row++) {
+        int y = row * m_tileSize;
         for (int col = 0; col < m_cols; col++) {
             int type = m_mapLayer[row][col];
             // Vẽ đúng tại tọa độ gốc của tile
             int x = col * m_tileSize;
-            int y = row * m_tileSize;
 
-            TextureManager::GetInstance()->DrawTile(m_textureID, 0, 0, x, y, m_tileSize, m_tileSize, 1, type, GameEngine::GetInstance()->GetRenderer());
+            texMgr->DrawTile(m_textureID, 0, 0, x, y, m_tileSize, m_tileSize, 1, type, renderer);
         }
     }
 }

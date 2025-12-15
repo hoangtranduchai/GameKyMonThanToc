@@ -4,7 +4,7 @@
 TextureManager* TextureManager::s_Instance = 0;
 
 // Hàm tải ảnh
-bool TextureManager::Load(std::string fileName, std::string id, SDL_Renderer* pRenderer) {
+bool TextureManager::Load(const std::string& fileName, const std::string& id, SDL_Renderer* pRenderer) {
     // Tạo surface tạm thời
     SDL_Surface* pTempSurface = IMG_Load(fileName.c_str());
     if (pTempSurface == 0) {
@@ -18,7 +18,11 @@ bool TextureManager::Load(std::string fileName, std::string id, SDL_Renderer* pR
 
     if (pTexture != 0) {
         // Lưu texture vào kho chứa với ID định danh
-        m_textureMap[id] = pTexture;
+        m_textureMap.emplace(id, pTexture);
+        // Cache dimensions immediately to avoid repeated SDL_QueryTexture
+        int w = 0, h = 0;
+        SDL_QueryTexture(pTexture, NULL, NULL, &w, &h);
+        m_textureSizeCache.emplace(id, std::make_pair(w, h));
         return true;
     }
 
@@ -27,7 +31,7 @@ bool TextureManager::Load(std::string fileName, std::string id, SDL_Renderer* pR
 }
 
 // Hàm vẽ cơ bản (cho Background, UI)
-void TextureManager::Draw(std::string id, int x, int y, int width, int height, SDL_Renderer* pRenderer, SDL_RendererFlip flip) {
+void TextureManager::Draw(const std::string& id, int x, int y, int width, int height, SDL_Renderer* pRenderer, SDL_RendererFlip flip) noexcept {
     SDL_Rect srcRect;
     SDL_Rect destRect;
 
@@ -35,8 +39,17 @@ void TextureManager::Draw(std::string id, int x, int y, int width, int height, S
     srcRect.x = 0;
     srcRect.y = 0;
     
-    // Query kích thước thật của ảnh để vẽ đúng tỉ lệ nếu cần (nhưng ở đây ta lấy toàn bộ)
-    SDL_QueryTexture(m_textureMap[id], NULL, NULL, &srcRect.w, &srcRect.h);
+    // Tránh operator[] gây tạo phần tử; kiểm tra tồn tại
+    auto it = m_textureMap.find(id);
+    if (it == m_textureMap.end()) return;
+    // Use cached dimensions instead of repeated SDL_QueryTexture call
+    auto sizeIt = m_textureSizeCache.find(id);
+    if (sizeIt != m_textureSizeCache.end()) {
+        srcRect.w = sizeIt->second.first;
+        srcRect.h = sizeIt->second.second;
+    } else {
+        SDL_QueryTexture(it->second, NULL, NULL, &srcRect.w, &srcRect.h);
+    }
 
     // Đích: Vị trí và kích thước muốn vẽ lên màn hình
     destRect.x = x;
@@ -45,13 +58,14 @@ void TextureManager::Draw(std::string id, int x, int y, int width, int height, S
     destRect.h = height;
 
     // Vẽ lên màn hình
-    SDL_RenderCopyEx(pRenderer, m_textureMap[id], &srcRect, &destRect, 0, 0, flip);
+    SDL_RenderCopyEx(pRenderer, it->second, &srcRect, &destRect, 0, 0, flip);
 }
 
 // Hàm vẽ Frame (cho Player, Animation)
-void TextureManager::DrawFrame(std::string id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer, double scale, SDL_RendererFlip flip) {
+void TextureManager::DrawFrame(const std::string& id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer, double scale, SDL_RendererFlip flip) noexcept {
     // An toàn: Không vẽ nếu chưa load
-    if (m_textureMap.find(id) == m_textureMap.end()) return;
+    auto it = m_textureMap.find(id);
+    if (it == m_textureMap.end()) return;
     
     SDL_Rect srcRect;
     SDL_Rect destRect;
@@ -72,27 +86,30 @@ void TextureManager::DrawFrame(std::string id, int x, int y, int width, int heig
     destRect.x = x;
     destRect.y = y;
 
-    SDL_RenderCopyEx(pRenderer, m_textureMap[id], &srcRect, &destRect, 0, 0, flip);
+    SDL_RenderCopyEx(pRenderer, it->second, &srcRect, &destRect, 0, 0, flip);
 }
 
 // Xóa texture cụ thể
-void TextureManager::Drop(std::string id) {
-    SDL_DestroyTexture(m_textureMap[id]);
-    m_textureMap.erase(id);
+void TextureManager::Drop(const std::string& id) noexcept {
+    auto it = m_textureMap.find(id);
+    if (it != m_textureMap.end()) {
+        SDL_DestroyTexture(it->second);
+        m_textureMap.erase(it);
+        m_textureSizeCache.erase(id);
+    }
 }
 
 // Dọn dẹp toàn bộ khi thoát game
-void TextureManager::Clean() {
-    std::map<std::string, SDL_Texture*>::iterator textureIter;
-    for (textureIter = m_textureMap.begin(); textureIter != m_textureMap.end(); textureIter++) {
-        SDL_DestroyTexture(textureIter->second);
+void TextureManager::Clean() noexcept {
+    for (auto& kv : m_textureMap) {
+        SDL_DestroyTexture(kv.second);
     }
     m_textureMap.clear();
+    m_textureSizeCache.clear();
     
     // Xóa Font
-    std::map<std::string, TTF_Font*>::iterator fontIter;
-    for (fontIter = m_fontMap.begin(); fontIter != m_fontMap.end(); fontIter++) {
-        TTF_CloseFont(fontIter->second);
+    for (auto& kv : m_fontMap) {
+        TTF_CloseFont(kv.second);
     }
     m_fontMap.clear();
     
@@ -100,9 +117,12 @@ void TextureManager::Clean() {
 }
 
 // Hàm lấy kích thước ảnh
-void TextureManager::GetTextureSize(std::string id, int* w, int* h) {
-    if (m_textureMap[id] != nullptr) {
-        SDL_QueryTexture(m_textureMap[id], NULL, NULL, w, h);
+void TextureManager::GetTextureSize(const std::string& id, int* w, int* h) const noexcept {
+    // Use cached size if available (faster than SDL_QueryTexture)
+    auto sizeIt = m_textureSizeCache.find(id);
+    if (sizeIt != m_textureSizeCache.end()) {
+        *w = sizeIt->second.first;
+        *h = sizeIt->second.second;
     } else {
         *w = 0;
         *h = 0;
@@ -110,13 +130,19 @@ void TextureManager::GetTextureSize(std::string id, int* w, int* h) {
 }
 
 // Hàm vẽ Tile chuyên dụng (dùng cho bản đồ)
-void TextureManager::DrawTile(std::string id, int margin, int spacing, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer) {
+void TextureManager::DrawTile(const std::string& id, int margin, int spacing, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer) noexcept {
     SDL_Rect srcRect;
     SDL_Rect destRect;
 
     // Tính toán vị trí tile trong ảnh tileset
-    srcRect.x = margin + (spacing + width) * currentFrame;
-    srcRect.y = margin + (spacing + height) * (currentRow - 1);
+        // Tính toán vị trí tile trong ảnh tileset (fast path when margin/spacing == 0 and row == 1)
+        if (margin == 0 && spacing == 0 && currentRow == 1) {
+            srcRect.x = width * currentFrame;
+            srcRect.y = 0;
+        } else {
+            srcRect.x = margin + (spacing + width) * currentFrame;
+            srcRect.y = margin + (spacing + height) * (currentRow - 1);
+        }
     srcRect.w = width;
     srcRect.h = height;
 
@@ -124,25 +150,28 @@ void TextureManager::DrawTile(std::string id, int margin, int spacing, int x, in
     destRect.y = y;
     destRect.w = width;
     destRect.h = height;
-
-    SDL_RenderCopyEx(pRenderer, m_textureMap[id], &srcRect, &destRect, 0, 0, SDL_FLIP_NONE);
+    auto it = m_textureMap.find(id);
+    if (it == m_textureMap.end()) return;
+    // No rotation/flip needed for tiles; use faster RenderCopy
+    SDL_RenderCopy(pRenderer, it->second, &srcRect, &destRect);
 }
 
-bool TextureManager::LoadFont(std::string fileName, std::string id, int size) {
+bool TextureManager::LoadFont(const std::string& fileName, const std::string& id, int size) {
     TTF_Font* pFont = TTF_OpenFont(fileName.c_str(), size);
     if (pFont == nullptr) {
         std::cout << "[Lỗi AAA] Khong the tai font: " << fileName << " - Lỗi: " << TTF_GetError() << std::endl;
         return false;
     }
-    m_fontMap[id] = pFont;
+    m_fontMap.emplace(id, pFont);
     return true;
 }
 
-void TextureManager::DrawText(std::string fontId, std::string text, int x, int y, SDL_Color color, SDL_Renderer* pRenderer) {
-    if (m_fontMap[fontId] == nullptr) return;
+void TextureManager::DrawText(const std::string& fontId, const std::string& text, int x, int y, SDL_Color color, SDL_Renderer* pRenderer) noexcept {
+    auto fIt = m_fontMap.find(fontId);
+    if (fIt == m_fontMap.end() || fIt->second == nullptr) return;
 
     // Tạo surface từ text
-    SDL_Surface* pSurface = TTF_RenderText_Solid(m_fontMap[fontId], text.c_str(), color);
+    SDL_Surface* pSurface = TTF_RenderText_Solid(fIt->second, text.c_str(), color);
     if (pSurface == nullptr) return;
 
     // Tạo texture từ surface
@@ -158,4 +187,45 @@ void TextureManager::DrawText(std::string fontId, std::string text, int x, int y
     // Dọn dẹp bộ nhớ ngay lập tức
     SDL_FreeSurface(pSurface);
     SDL_DestroyTexture(pTexture);
+}
+
+bool TextureManager::CreateTextTexture(const std::string& fontId, const std::string& text, const std::string& id, SDL_Color color, SDL_Renderer* pRenderer) {
+    auto fIt = m_fontMap.find(fontId);
+    if (fIt == m_fontMap.end() || fIt->second == nullptr) return false;
+
+    SDL_Surface* pSurface = TTF_RenderText_Solid(fIt->second, text.c_str(), color);
+    if (pSurface == nullptr) return false;
+
+    SDL_Texture* pTexture = SDL_CreateTextureFromSurface(pRenderer, pSurface);
+    if (pTexture == nullptr) {
+        SDL_FreeSurface(pSurface);
+        return false;
+    }
+
+    m_textCache.emplace(id, pTexture);
+    m_textSizeCache.emplace(id, std::make_pair(pSurface->w, pSurface->h));
+
+    SDL_FreeSurface(pSurface);
+    return true;
+}
+
+void TextureManager::DrawTextCached(const std::string& id, int x, int y, SDL_Renderer* pRenderer) const noexcept {
+    auto it = m_textCache.find(id);
+    if (it == m_textCache.end() || it->second == nullptr) return;
+
+    auto sizeIt = m_textSizeCache.find(id);
+    if (sizeIt == m_textSizeCache.end()) return;
+
+    SDL_Rect srcRect = {0, 0, sizeIt->second.first, sizeIt->second.second};
+    SDL_Rect destRect = {x, y, sizeIt->second.first, sizeIt->second.second};
+    SDL_RenderCopy(pRenderer, it->second, &srcRect, &destRect);
+}
+
+void TextureManager::DropText(const std::string& id) noexcept {
+    auto it = m_textCache.find(id);
+    if (it != m_textCache.end()) {
+        SDL_DestroyTexture(it->second);
+        m_textCache.erase(it);
+    }
+    m_textSizeCache.erase(id);
 }

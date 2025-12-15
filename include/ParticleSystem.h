@@ -31,6 +31,9 @@ public:
     // Dọn dẹp
     void Clean() { m_particles.clear(); }
 
+    // Preallocate particle storage to reduce reallocations
+    void Reserve(size_t capacity) { m_particles.reserve(capacity); }
+
 private:
     ParticleSystem() {}
     std::vector<Particle> m_particles;

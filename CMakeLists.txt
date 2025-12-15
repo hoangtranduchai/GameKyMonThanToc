@@ -10,10 +10,17 @@ project(KyMonThanToc VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Bật Warning Levels cao để bắt lỗi code ngay từ đầu (giúp code không tì vết)
-if(CMAKE_COMPILER_IS_GNU_CXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # Các cờ tối ưu và cảnh báo nghiêm ngặt
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Werror -g -O3")
+# Bật Warning Levels cao và tối ưu phù hợp từng compiler/configuration
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-Wall -Wextra -Wpedantic)
+    # Debug: giữ symbol, Release: tối ưu mạnh
+    add_compile_options($<$<CONFIG:Debug>:-g> $<$<CONFIG:Release>:-O3>)
+elseif(MSVC)
+    # MSVC warning level và tối ưu
+    add_compile_options(/W4)
+    add_compile_options($<$<CONFIG:Release>:/O2 /DNDEBUG> $<$<CONFIG:Debug>:/Zi>)
+    # Tắt CRT secure warnings noise nếu cần
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif()
 
 # 1. Thêm thư mục chứa file header (.h) của dự án

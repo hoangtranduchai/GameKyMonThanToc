@@ -6,6 +6,7 @@
 #include <string>
 #include "SoundManager.h"
 #include "ParticleSystem.h"
+#include "Config.h"
 
 // Khởi tạo biến static instance
 GameEngine* GameEngine::s_Instance = nullptr;
@@ -110,8 +111,11 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     if (!TextureManager::GetInstance()->Load(cloudPath, "clouds", m_pRenderer)) return false;
     
     // Đặt alpha mod cho mây (để nó hơi trong suốt, hòa trộn với nền trời)
-    SDL_Texture* cloudTex = TextureManager::GetInstance()->GetTexture("clouds"); // Cần thêm hàm Getter này vào TextureManager nếu chưa có
-    // Nếu lười thêm Getter, bạn có thể set alpha ngay trong hàm Render bằng SDL_SetTextureAlphaMod
+    SDL_Texture* cloudTex = TextureManager::GetInstance()->GetTexture("clouds");
+    if (cloudTex) {
+        // Đặt alpha mây 1 lần khi khởi tạo thay vì mỗi frame
+        SDL_SetTextureAlphaMod(cloudTex, 80);
+    }
     
     m_cloudScrollX_1 = 0.0f;
     m_cloudScrollX_2 = 0.0f;
@@ -122,8 +126,9 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     // --- KHỞI TẠO HỆ THỐNG LEVEL ---
     m_levelFiles.clear();
-    // Đăng ký các màn chơi vào hệ thống
     int CountLevels = 3; // Cập nhật số lượng level ở đây
+    m_levelFiles.reserve(CountLevels);
+    // Đăng ký các màn chơi vào hệ thống
     for (int i = 1; i <= CountLevels; ++i) {
         std::string levelFile = std::string(PROJECT_ROOT_PATH) + "/assets/levels/level" + std::to_string(i) + ".txt";
         m_levelFiles.push_back(levelFile);
@@ -188,6 +193,9 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     // Cập nhật tổng số Shrine từ Map
     m_totalShrines = m_pMap->GetShrines().size();
+    // Preallocate visited shrines list to expected size
+    m_visitedShrinesList.clear();
+    if (m_totalShrines > 0) m_visitedShrinesList.reserve(m_totalShrines);
 
     // --- LOAD FONT CHO HUD ---
     // Vì Logical Height có thể lên tới 2000-3000px, Font size phải to tương ứng
@@ -198,6 +206,19 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Nếu chưa có file font, hãy tạo folder assets/fonts và copy file ttf vào!
     // Ở đây tôi giả định bạn sẽ làm việc đó.
     TextureManager::GetInstance()->LoadFont(fontPath, "gui_font", fontSize);
+
+    // --- Cache static HUD/menu texts ---
+    {
+        SDL_Color gold = {255, 215, 0, 255};
+        SDL_Color outline = {200, 100, 0, 255};
+        SDL_Color shadow = {0, 0, 0, 200};
+        // Title variants
+        TextureManager::GetInstance()->CreateTextTexture("gui_font", "KY MON THAN TOC", "title_main", gold, m_pRenderer);
+        TextureManager::GetInstance()->CreateTextTexture("gui_font", "KY MON THAN TOC", "title_outline", outline, m_pRenderer);
+        TextureManager::GetInstance()->CreateTextTexture("gui_font", "KY MON THAN TOC", "title_shadow", shadow, m_pRenderer);
+        // Help label (gold)
+        TextureManager::GetInstance()->CreateTextTexture("gui_font", "[U] HOI TUONG   [ESC] MENU", "help_label", gold, m_pRenderer);
+    }
 
     // --- LOAD MENU ART (AAA) ---
     // Đảm bảo file player.png nằm trong assets/images/
@@ -440,15 +461,16 @@ void GameEngine::HandleEvents() {
 
 // Cập nhật logic Game
 void GameEngine::Update() {
-    // Tính toán Delta Time
-    static Uint32 lastTick = SDL_GetTicks(); // Biến static cục bộ để giữ giá trị giữa các lần gọi
+    // Tính toán Delta Time (with caching for efficiency)
+    static Uint32 lastTick = SDL_GetTicks();
     Uint32 currentTick = SDL_GetTicks();
     m_deltaTime = (currentTick - lastTick) / 1000.0f;
     lastTick = currentTick;
 
     // Đặt giới hạn DeltaTime để tránh lỗi khi pause/debug quá lâu
-    if (m_deltaTime > 0.05f) { // Ví dụ: Giới hạn 50ms/frame (20 FPS tối thiểu)
-        m_deltaTime = 0.05f;
+    const float MAX_DELTA = 0.05f;
+    if (m_deltaTime > MAX_DELTA) {
+        m_deltaTime = MAX_DELTA;
     }
     
     // --- LOGIC CHUYỂN CẢNH (TRANSITION SYSTEM) ---
@@ -489,12 +511,14 @@ void GameEngine::Update() {
             if (m_pPlayer) m_pPlayer->Update();
             ParticleSystem::GetInstance()->Update(m_deltaTime);
             
-            // Mây trôi
-            m_cloudScrollX_1 -= CLOUD_SPEED_1 * m_deltaTime;
-            m_cloudScrollX_2 -= CLOUD_SPEED_2 * m_deltaTime;
-            // Reset khi trôi hết kích thước ảnh (Giả sử ảnh rộng 1280px hoặc lấy width từ TextureManager)
-            // Ở đây ta giả định ảnh rộng ít nhất bằng màn hình logic.
-            int mapW = m_pMap->GetMapPixelWidth(); // Hoặc lấy width cửa sổ
+            // Mây trôi (cache delta time multiplications)
+            const float cloudDelta1 = CLOUD_SPEED_1 * m_deltaTime;
+            const float cloudDelta2 = CLOUD_SPEED_2 * m_deltaTime;
+            m_cloudScrollX_1 -= cloudDelta1;
+            m_cloudScrollX_2 -= cloudDelta2;
+            
+            // Reset khi trôi hết kích thước ảnh
+            int mapW = m_pMap->GetMapPixelWidth();
             
             // Logic cuộn vô tận
             if (m_cloudScrollX_1 <= -mapW) m_cloudScrollX_1 = 0;
@@ -515,10 +539,11 @@ void GameEngine::Update() {
         
         // Tạo thêm hạt nổ tưng bừng trong lúc chờ
         if ((int)(m_winDelayTimer * 10) % 2 == 0) { // Cứ mỗi vài frame
-             int w = m_pMap->GetMapPixelWidth();
-             int h = m_pMap->GetMapPixelHeight();
-             // Bắn pháo hoa ngẫu nhiên
-             ParticleSystem::GetInstance()->Emit(rand() % w, rand() % h, 10, {255, 215, 0, 255});
+            int w = m_pMap->GetMapPixelWidth();
+            int h = m_pMap->GetMapPixelHeight();
+            // Bắn pháo hoa ngẫu nhiên (cache colors)
+            static SDL_Color goldColor = {255, 215, 0, 255};
+            ParticleSystem::GetInstance()->Emit(rand() % w, rand() % h, 10, goldColor);
         }
 
         if (m_winDelayTimer <= 0.0f) {
@@ -569,8 +594,8 @@ void GameEngine::ResetGame() {
 }
 
 void GameEngine::OnShrineVisited(int row, int col) {
-    // Kiểm tra xem shrine này đã mở chưa
-    for (auto& pos : m_visitedShrinesList) {
+    // Kiểm tra xem shrine này đã mở chưa (use linear search only once)
+    for (const auto& pos : m_visitedShrinesList) {
         if (pos.first == row && pos.second == col) return; // Đã mở rồi
     }
 
@@ -580,7 +605,6 @@ void GameEngine::OnShrineVisited(int row, int col) {
 
     // --- HIỆU ỨNG HÌNH ẢNH AAA ---
     // Khi ăn xong, biến Trận Nhãn (ID 2) thành Đất Thường (ID 0)
-    // Để người chơi thấy Trận Nhãn "biến mất" hoặc "tắt sáng"
     m_pMap->SetTileID(row, col, 0);
     
     // Phát hiệu ứng âm thanh khi khai mở Trận Nhãn
@@ -588,18 +612,18 @@ void GameEngine::OnShrineVisited(int row, int col) {
 
     // --- KÍCH HOẠT HIỆU ỨNG NĂNG LƯỢNG (AAA MOMENT) ---
     int tileSize = m_pMap->GetTileSize();
-    // Tính tâm của ô Trận Nhãn
-    int centerX = col * tileSize + tileSize / 2;
-    int centerY = row * tileSize + tileSize / 2;
+    // Tính tâm của ô Trận Nhãn (cache calculations)
+    int centerX = col * tileSize + (tileSize >> 1);  // Use bit shift instead of division
+    int centerY = row * tileSize + (tileSize >> 1);
     
-    // Màu xanh ngọc (Cyan) rực rỡ giống vũ khí nhân vật
+    // Màu xanh ngọc (Cyan)
     SDL_Color magicColor = {0, 255, 255, 255}; 
+    SDL_Color goldColor = {255, 215, 0, 255};
     
-    // Bắn ra 500 hạt năng lượng
+    // Bắn ra hạt năng lượng
+    ParticleSystem::GetInstance()->Reserve(800);
     ParticleSystem::GetInstance()->Emit(centerX, centerY, 500, magicColor);
-    
-    // Có thể thêm màu vàng kim loại (Gold) xen kẽ
-    ParticleSystem::GetInstance()->Emit(centerX, centerY, 200, {255, 215, 0, 255});
+    ParticleSystem::GetInstance()->Emit(centerX, centerY, 200, goldColor);
     
     std::cout << ">>> DA KHAI MO TRAN NHAN! (" << m_shrinesCollected << "/" << m_totalShrines << ")" << std::endl;
 
@@ -645,24 +669,37 @@ void GameEngine::DrawHUD() {
     SDL_Color red  = {255, 80, 80, 255};
 
     // --- LEFT: THIÊN MỆNH (BƯỚC CHÂN) ---
+    static std::string lastStepStr;
     std::string stepStr = "THIEN MENH: " + std::to_string(m_currentSteps) + " / " + std::to_string(m_optimalSteps);
-    // Nếu đi quá số bước -> Chữ đỏ cảnh báo
-    SDL_Color stepColor = (m_currentSteps <= m_optimalSteps) ? white : red;
-    
-    // Vẽ bóng chữ (Shadow) để tạo khối 3D
-    TextureManager::GetInstance()->DrawText("gui_font", stepStr, 32, 12, {0,0,0,255}, m_pRenderer); // Bóng đen
-    TextureManager::GetInstance()->DrawText("gui_font", stepStr, 30, 10, stepColor, m_pRenderer);   // Chữ chính
+    // Nếu đổi nội dung -> cập nhật cache
+    if (stepStr != lastStepStr) {
+        TextureManager::GetInstance()->DropText("hud_steps_shadow");
+        TextureManager::GetInstance()->DropText("hud_steps");
+        TextureManager::GetInstance()->CreateTextTexture("gui_font", stepStr, "hud_steps_shadow", {0,0,0,255}, m_pRenderer);
+        SDL_Color stepColorDyn = (m_currentSteps <= m_optimalSteps) ? white : red;
+        TextureManager::GetInstance()->CreateTextTexture("gui_font", stepStr, "hud_steps", stepColorDyn, m_pRenderer);
+        lastStepStr = stepStr;
+    }
+    // Vẽ bóng + chữ từ cache
+    TextureManager::GetInstance()->DrawTextCached("hud_steps_shadow", 32, 12, m_pRenderer);
+    TextureManager::GetInstance()->DrawTextCached("hud_steps", 30, 10, m_pRenderer);
 
     // --- CENTER: KHAI MỞ (TIẾN ĐỘ) ---
+    static std::string lastShrineStr;
     std::string shrineStr = "TRAN NHAN: " + std::to_string(m_shrinesCollected) + " / " + std::to_string(m_totalShrines);
-    // Căn giữa (Hardcode ước lượng w/2 - 120)
-    TextureManager::GetInstance()->DrawText("gui_font", shrineStr, w/2 - 118, 12, {0,0,0,255}, m_pRenderer); // Bóng
-    TextureManager::GetInstance()->DrawText("gui_font", shrineStr, w/2 - 120, 10, cyan, m_pRenderer);        // Chữ Cyan sáng rực
+    if (shrineStr != lastShrineStr) {
+        TextureManager::GetInstance()->DropText("hud_shrine_shadow");
+        TextureManager::GetInstance()->DropText("hud_shrine");
+        TextureManager::GetInstance()->CreateTextTexture("gui_font", shrineStr, "hud_shrine_shadow", {0,0,0,255}, m_pRenderer);
+        TextureManager::GetInstance()->CreateTextTexture("gui_font", shrineStr, "hud_shrine", cyan, m_pRenderer);
+        lastShrineStr = shrineStr;
+    }
+    TextureManager::GetInstance()->DrawTextCached("hud_shrine_shadow", w/2 - 118, 12, m_pRenderer);
+    TextureManager::GetInstance()->DrawTextCached("hud_shrine", w/2 - 120, 10, m_pRenderer);
 
     // --- RIGHT: PHÍM TẮT ---
-    std::string helpStr = "[U] HOI TUONG   [ESC] MENU";
-    TextureManager::GetInstance()->DrawText("gui_font", helpStr, w - 318, 12, {0,0,0,255}, m_pRenderer);
-    TextureManager::GetInstance()->DrawText("gui_font", helpStr, w - 320, 10, gold, m_pRenderer);
+    // Help text (cached gold label)
+    TextureManager::GetInstance()->DrawTextCached("help_label", w - 320, 10, m_pRenderer);
 }
 
 // ---------------------------------------------------------------------------
@@ -675,6 +712,9 @@ void GameEngine::Render() {
     // Lấy kích thước màn hình
     int w = m_pMap->GetMapPixelWidth(); // Hoặc m_windowWidth nếu dùng Auto-Scale
     int h = m_pMap->GetMapPixelHeight();
+    // Cache TextureManager and Renderer pointers
+    auto* texMgr = TextureManager::GetInstance();
+    auto* renderer = m_pRenderer;
 
     // --- MÁY TRẠNG THÁI HÌNH ẢNH (VISUAL STATE MACHINE) ---
     switch (m_currentState) {
@@ -685,22 +725,17 @@ void GameEngine::Render() {
         case STATE_MENU: {
             // A. Lớp Nền: Background Art (player.png)
             // Vẽ full màn hình
-            TextureManager::GetInstance()->Draw("menu_background", 0, 0, w, h, m_pRenderer);
+            texMgr->Draw("menu_background", 0, 0, w, h, renderer);
             
             // B. Lớp Khí Quyển: Mây Trôi (Vẽ NGAY SAU nền, TRƯỚC UI)
             // Lớp 1 (Xa)
-            TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1, 0, w, h, m_pRenderer);
-            TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1 + w, 0, w, h, m_pRenderer);
+            texMgr->Draw("clouds", (int)m_cloudScrollX_1, 0, w, h, renderer);
+            texMgr->Draw("clouds", (int)m_cloudScrollX_1 + w, 0, w, h, renderer);
             
             // Lớp 2 (Gần - Mờ ảo sương khói)
-            SDL_Texture* cloudTex = TextureManager::GetInstance()->GetTexture("clouds");
-            if (cloudTex) {
-                // Giảm Alpha xuống 80 để mây chỉ là lớp sương mờ, không che mất Art nhân vật
-                SDL_SetTextureAlphaMod(cloudTex, 80); 
-                TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_2, 0, w, h, m_pRenderer);
-                TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_2 + w, 0, w, h, m_pRenderer);
-                SDL_SetTextureAlphaMod(cloudTex, 255); // Reset ngay lập tức
-            }
+            // Alpha mây đã được set tại Init; không cần đổi lại mỗi frame
+            texMgr->Draw("clouds", (int)m_cloudScrollX_2, 0, w, h, renderer);
+            texMgr->Draw("clouds", (int)m_cloudScrollX_2 + w, 0, w, h, renderer);
 
             // C. Lớp Giao Diện (UI Layer) - Vẽ đè lên tất cả
             
@@ -716,11 +751,11 @@ void GameEngine::Render() {
             int titleTextX = w/2 - 190; 
             int titleTextY = titleY + 40;
             // Bóng đen đậm
-            TextureManager::GetInstance()->DrawText("gui_font", "KY MON THAN TOC", titleTextX + 4, titleTextY + 4, {0,0,0,200}, m_pRenderer); 
+            texMgr->DrawTextCached("title_shadow", titleTextX + 4, titleTextY + 4, renderer);
             // Viền sáng nhẹ
-            TextureManager::GetInstance()->DrawText("gui_font", "KY MON THAN TOC", titleTextX + 2, titleTextY + 2, {200,100,0,255}, m_pRenderer); 
+            texMgr->DrawTextCached("title_outline", titleTextX + 2, titleTextY + 2, renderer);
             // Chữ chính màu Vàng Kim
-            TextureManager::GetInstance()->DrawText("gui_font", "KY MON THAN TOC", titleTextX, titleTextY, {255, 215, 0, 255}, m_pRenderer);
+            texMgr->DrawTextCached("title_main", titleTextX, titleTextY, renderer);
 
             // --- MENU BUTTONS ---
             int btnW = 350; 

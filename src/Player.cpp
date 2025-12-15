@@ -103,7 +103,10 @@ void Player::HandleInput() {
     Uint32 currentTime = SDL_GetTicks();
     
     // Nếu nhân vật đã đến đích (Visual đuổi kịp Logic) và không bấm phím -> Về IDLE
-    if (abs(m_x - m_visualX) < 2.0f && abs(m_y - m_visualY) < 2.0f) {
+    // Cache deltas and avoid abs() for floating point comparisons
+    float dx = m_x - m_visualX;
+    float dy = m_y - m_visualY;
+    if ((dx < 2.0f && dx > -2.0f) && (dy < 2.0f && dy > -2.0f)) {
         // Chỉ reset về IDLE nếu đang không bị cooldown di chuyển chặn
         if (currentTime - m_lastMoveTime > MOVE_DELAY) {
              m_currentState = STATE_IDLE;
@@ -183,15 +186,18 @@ void Player::Update() {
     HandleInput(); // Xử lý logic nhảy ô (thay đổi m_x, m_y)
 
     // 1. Smooth Movement (Lerp)
-    float dt = GameEngine::GetInstance()->GetDeltaTime();
+    const float dt = GameEngine::GetInstance()->GetDeltaTime();
+    const float smooth_dt = SMOOTH_SPEED * dt;  // Cache multiplication
     
     // Nội suy Visual về phía Logic
     // Dùng Epsilon 1.0f để snap vị trí khi đã rất gần, tránh rung
-    if (abs(m_x - m_visualX) < 1.0f) m_visualX = (float)m_x;
-    else m_visualX += (m_x - m_visualX) * SMOOTH_SPEED * dt;
+    float dx = m_x - m_visualX;
+    if (dx < 1.0f && dx > -1.0f) m_visualX = (float)m_x;
+    else m_visualX += dx * smooth_dt;
 
-    if (abs(m_y - m_visualY) < 1.0f) m_visualY = (float)m_y;
-    else m_visualY += (m_y - m_visualY) * SMOOTH_SPEED * dt;
+    float dy = m_y - m_visualY;
+    if (dy < 1.0f && dy > -1.0f) m_visualY = (float)m_y;
+    else m_visualY += dy * smooth_dt;
 
     // 2. Animation Frame Update (Độc lập với logic di chuyển)
     // Sử dụng SDL_GetTicks để tính frame dựa trên thời gian thực

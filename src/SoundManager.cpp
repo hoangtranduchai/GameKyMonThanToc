@@ -1,42 +1,44 @@
 #include "SoundManager.h"
 
-bool SoundManager::LoadMusic(std::string fileName, std::string id) {
+bool SoundManager::LoadMusic(const std::string& fileName, const std::string& id) {
     Mix_Music* pMusic = Mix_LoadMUS(fileName.c_str());
     if (pMusic == nullptr) {
         std::cout << "[Loi Audio] Khong the tai nhac: " << fileName << " - " << Mix_GetError() << std::endl;
         return false;
     }
-    m_musicMap[id] = pMusic;
+    m_musicMap.emplace(id, pMusic);
     return true;
 }
 
-bool SoundManager::LoadSFX(std::string fileName, std::string id) {
+bool SoundManager::LoadSFX(const std::string& fileName, const std::string& id) {
     Mix_Chunk* pChunk = Mix_LoadWAV(fileName.c_str());
     if (pChunk == nullptr) {
         std::cout << "[Loi Audio] Khong the tai SFX: " << fileName << " - " << Mix_GetError() << std::endl;
         return false;
     }
-    m_sfxMap[id] = pChunk;
+    m_sfxMap.emplace(id, pChunk);
     return true;
 }
 
-void SoundManager::PlayMusic(std::string id, int loop) {
-    if (m_musicMap[id] != nullptr) {
-        Mix_PlayMusic(m_musicMap[id], loop);
+void SoundManager::PlayMusic(const std::string& id, int loop) noexcept {
+    auto it = m_musicMap.find(id);
+    if (it != m_musicMap.end() && it->second != nullptr) {
+        Mix_PlayMusic(it->second, loop);
     }
 }
 
-void SoundManager::PlaySFX(std::string id) {
-    if (m_sfxMap[id] != nullptr) {
-        Mix_PlayChannel(-1, m_sfxMap[id], 0);
+void SoundManager::PlaySFX(const std::string& id) noexcept {
+    auto it = m_sfxMap.find(id);
+    if (it != m_sfxMap.end() && it->second != nullptr) {
+        Mix_PlayChannel(-1, it->second, 0);
     }
 }
 
-void SoundManager::SetMusicVolume(int volume) {
+void SoundManager::SetMusicVolume(int volume) noexcept {
     Mix_VolumeMusic(volume);  // 0-128
 }
 
-void SoundManager::Clean() {
+void SoundManager::Clean() noexcept {
     // Xóa SFX
     for (auto const& [key, val] : m_sfxMap) {
         Mix_FreeChunk(val);

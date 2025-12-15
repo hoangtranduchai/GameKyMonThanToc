@@ -23,22 +23,23 @@ void ParticleSystem::Emit(int x, int y, int count, SDL_Color color) {
 }
 
 void ParticleSystem::Update(float dt) {
-    for (auto it = m_particles.begin(); it != m_particles.end(); ) {
+    // Use index-based iteration for better cache locality on erase
+    for (int i = (int)m_particles.size() - 1; i >= 0; --i) {
+        Particle& p = m_particles[i];
         // Di chuyển hạt
-        it->x += it->velX * dt;
-        it->y += it->velY * dt;
+        p.x += p.velX * dt;
+        p.y += p.velY * dt;
         
         // Giảm tuổi thọ
-        it->life -= dt;
+        p.life -= dt;
         
         // Hiệu ứng trọng lực nhẹ (nếu muốn hạt rơi xuống)
-        // it->velY += 200.0f * dt; 
+        // p.velY += 200.0f * dt; 
 
-        // Nếu hết đời -> Xóa
-        if (it->life <= 0.0f) {
-            it = m_particles.erase(it);
-        } else {
-            ++it;
+        // Nếu hết đời -> Xóa (swap-erase from back is faster)
+        if (p.life <= 0.0f) {
+            std::swap(m_particles[i], m_particles.back());
+            m_particles.pop_back();
         }
     }
 }
