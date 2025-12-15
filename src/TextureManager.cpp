@@ -50,6 +50,9 @@ void TextureManager::Draw(std::string id, int x, int y, int width, int height, S
 
 // Hàm vẽ Frame (cho Player, Animation)
 void TextureManager::DrawFrame(std::string id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer, double scale, SDL_RendererFlip flip) {
+    // An toàn: Không vẽ nếu chưa load
+    if (m_textureMap.find(id) == m_textureMap.end()) return;
+    
     SDL_Rect srcRect;
     SDL_Rect destRect;
 
@@ -68,9 +71,6 @@ void TextureManager::DrawFrame(std::string id, int x, int y, int width, int heig
     // 3. Vị trí vẽ
     destRect.x = x;
     destRect.y = y;
-
-    // Đảm bảo không vẽ ảnh chưa load
-    if (m_textureMap[id] == nullptr) return;
 
     SDL_RenderCopyEx(pRenderer, m_textureMap[id], &srcRect, &destRect, 0, 0, flip);
 }

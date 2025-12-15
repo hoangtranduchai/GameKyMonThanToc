@@ -104,6 +104,18 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     std::string bgPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/background.png";
     if (!TextureManager::GetInstance()->Load(bgPath, "background", m_pRenderer)) return false;
 
+    // Load ảnh mây (Seamless)
+    std::string cloudPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/clouds.png";
+    // Chúng ta dùng cùng 1 ảnh nhưng vẽ 2 lần với tốc độ/độ trong suốt khác nhau
+    if (!TextureManager::GetInstance()->Load(cloudPath, "clouds", m_pRenderer)) return false;
+    
+    // Đặt alpha mod cho mây (để nó hơi trong suốt, hòa trộn với nền trời)
+    SDL_Texture* cloudTex = TextureManager::GetInstance()->GetTexture("clouds"); // Cần thêm hàm Getter này vào TextureManager nếu chưa có
+    // Nếu lười thêm Getter, bạn có thể set alpha ngay trong hàm Render bằng SDL_SetTextureAlphaMod
+    
+    m_cloudScrollX_1 = 0.0f;
+    m_cloudScrollX_2 = 0.0f;
+
     // Load Tileset Image
     std::string tilePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/tiles.png";
     if (!TextureManager::GetInstance()->Load(tilePath, "tiles", m_pRenderer)) return false;
@@ -185,13 +197,12 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Vòng lặp tự động nạp tất cả ảnh
     for (const auto& act : actions) {
         for (const auto& dir : directions) {
-            // Xây dựng đường dẫn file: assets/images/player/[ACTION]/[action]_[dir].png
+            // Xây dựng đường dẫn file: assets/images/player/[action]_[dir].png
             
-            // Ví dụ path: assets/images/player/idle/idle_down.png
-            std::string folderName = act; // idle, run, attack1...
+            // Ví dụ path: assets/images/player/idle_down.png
             std::string fileName = act + "_" + dir + ".png";
             
-            std::string fullPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player/" + folderName + "/" + fileName;
+            std::string fullPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player/" + fileName;
             
             // ID trong TextureManager: "player_idle_down", "player_run_left"...
             std::string textureID = "player_" + act + "_" + dir;
@@ -204,7 +215,7 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     // --- KHỞI TẠO PLAYER ---
     // Lưu ý: TextureID ban đầu là "player_idle_down"
-    // Kích thước frame cần đo chính xác từ ảnh (Ví dụ ảnh RUN 8 frame rộng 5120px -> 1 frame = 640px)
+    // Kích thước frame cần đo chính xác từ ảnh (Ví dụ ảnh RUN 8 frame rộng 768px -> 1 frame = 96px)
     int frameW = 96;
     int frameH = 80;
 
@@ -365,6 +376,18 @@ void GameEngine::Update() {
     }
 
     ParticleSystem::GetInstance()->Update(m_deltaTime);
+
+    // Cập nhật vị trí mây trôi
+    m_cloudScrollX_1 -= CLOUD_SPEED_1 * m_deltaTime;
+    m_cloudScrollX_2 -= CLOUD_SPEED_2 * m_deltaTime;
+
+    // Reset khi trôi hết kích thước ảnh (Giả sử ảnh rộng 1280px hoặc lấy width từ TextureManager)
+    // Ở đây ta giả định ảnh rộng ít nhất bằng màn hình logic.
+    int mapW = m_pMap->GetMapPixelWidth(); // Hoặc lấy width cửa sổ
+    
+    // Logic cuộn vô tận
+    if (m_cloudScrollX_1 <= -mapW) m_cloudScrollX_1 = 0;
+    if (m_cloudScrollX_2 <= -mapW) m_cloudScrollX_2 = 0;
 }
 
 void GameEngine::OnPlayerMove() {
@@ -452,6 +475,34 @@ void GameEngine::Render() {
     int w = m_pMap->GetMapPixelWidth();
     int h = m_pMap->GetMapPixelHeight();
 
+    // 1. Vẽ Background tĩnh (Màu trời)
+    // Nếu bạn có ảnh background.png là bầu trời xanh, vẽ nó trước.
+    TextureManager::GetInstance()->Draw("background", 0, 0, w, h, m_pRenderer);
+
+    // 2. --- VẼ MÂY TRÔI (PARALLAX LAYERS) ---
+    // Để vẽ mây lặp lại vô tận, ta cần vẽ 2 tấm ảnh nối đuôi nhau cho mỗi lớp.
+    
+    // Lớp 1: Xa, Chậm, Rõ nét hơn
+    TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1, 0, w, h, m_pRenderer);
+    TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1 + w, 0, w, h, m_pRenderer); // Ảnh nối đuôi
+
+    // // Lớp 2: Gần, Nhanh, Mờ ảo (Sương mù)
+    // // Mẹo AAA: Vẽ lớp này hơi to hơn hoặc lệch đi để tạo sự khác biệt
+    // // Cần set Alpha cho lớp này để nhìn xuyên thấu
+    SDL_Texture* cloudTex = TextureManager::GetInstance()->GetTexture("clouds");
+    if (cloudTex) {
+        SDL_SetTextureAlphaMod(cloudTex, 150); // Độ trong suốt 150/255
+        SDL_SetTextureColorMod(cloudTex, 200, 240, 255); // Ám xanh nhẹ
+        
+        // Vẽ lớp 2 (Lệch một chút để không trùng khớp hoàn toàn với lớp 1)
+        TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_2, 0, w, h, m_pRenderer);
+        TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_2 + w, 0, w, h, m_pRenderer);
+        
+        // Reset lại màu/alpha để không ảnh hưởng lần vẽ sau (Lớp 1 ở frame sau)
+        SDL_SetTextureAlphaMod(cloudTex, 255);
+        SDL_SetTextureColorMod(cloudTex, 255, 255, 255);
+    }
+
     // --- VẼ HIỆU ỨNG HẠT (VFX) ---
     ParticleSystem::GetInstance()->Render(m_pRenderer);
 
@@ -461,7 +512,7 @@ void GameEngine::Render() {
     switch (m_currentState) {
         case STATE_MENU: {
             // 1. Vẽ Background mờ ảo (có thể vẽ Map làm nền)
-            if (m_pMap) m_pMap->DrawMap();
+            // if (m_pMap) m_pMap->DrawMap();
             
             // 2. Vẽ Tiêu Đề Lớn "KỲ MÔN THẦN TỐC"
             // (Bạn nên tạo font size lớn hơn trong Init cho đẹp)

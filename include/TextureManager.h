@@ -22,6 +22,11 @@ public:
     
     // Dọn dẹp toàn bộ texture (dùng khi tắt game)
     void Clean();
+
+    // Lấy con trỏ texture gốc (để chỉnh Alpha/Color Mod)
+    SDL_Texture* GetTexture(std::string id) {
+        return m_textureMap[id];
+    }
     
     // Lấy kích thước ảnh (để tính toán va chạm hoặc scale)
     void GetTextureSize(std::string id, int* w, int* h);

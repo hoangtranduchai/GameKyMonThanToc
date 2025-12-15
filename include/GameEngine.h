@@ -156,4 +156,12 @@ private:
     
     // Biến hiệu ứng nhấp nháy cho text "Press Enter"
     float m_blinkTimer;
+
+    // --- HỆ THỐNG PARALLAX SKY AAA ---
+    float m_cloudScrollX_1; // Lớp mây xa (chậm)
+    float m_cloudScrollX_2; // Lớp mây gần (nhanh)
+    
+    // Tốc độ trôi
+    const float CLOUD_SPEED_1 = 20.0f; 
+    const float CLOUD_SPEED_2 = 50.0f;
 };
