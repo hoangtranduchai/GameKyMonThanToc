@@ -36,12 +36,12 @@ private:
     
     // --- BIẾN LOGIC DI CHUYỂN ---
     Uint32 m_lastMoveTime; 
-    const int MOVE_DELAY = 150; // Tốc độ lướt đi
+    const int MOVE_DELAY = 130; // Tốc độ lướt đi
 
     // --- BIẾN VISUAL AAA (Giữ lại để mượt mà) ---
     float m_visualX;
     float m_visualY;
-    const float SMOOTH_SPEED = 12.0f; // Độ mượt khi nội suy
+    const float SMOOTH_SPEED = 15.0f; // Độ mượt khi nội suy
     float m_scale;                    // Tỷ lệ phóng to nhân vật
     
     // --- BIẾN ANIMATION ---

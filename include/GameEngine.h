@@ -18,19 +18,16 @@ class Player;
 enum GameState {
     STATE_MENU,     // Màn hình chờ: Nơi cảm xúc bắt đầu
     STATE_PLAY,     // Màn hình chơi: Nơi trí tuệ thăng hoa
+    STATE_PAUSE,    // Màn hình tạm dừng: Nơi tĩnh lặng
     STATE_WIN       // Màn hình thắng: Nơi vinh quang tỏa sáng
 };
 
 // Cấu trúc Snapshot: Lưu giữ khoảnh khắc lịch sử
-// Được tối ưu hóa bộ nhớ, chỉ lưu những gì cần thiết
 struct GameStateMoment {
     int playerGridRow;       // Vị trí dòng của Player
     int playerGridCol;       // Vị trí cột của Player
     int currentSteps;        // Số bước chân
     int shrinesCollected;    // Số lượng đã thu thập
-    
-    // Danh sách tọa độ các Trận Nhãn ĐÃ MỞ tại thời điểm này
-    // Dùng vector nhỏ (N <= 15) nên copy rất nhanh, an toàn hơn con trỏ
     std::vector<std::pair<int, int>> visitedShrinesSnapshot;
 };
 
@@ -59,7 +56,6 @@ public:
 
     SDL_Renderer* GetRenderer() const {
         return m_pRenderer;
-    
     }
     float GetDeltaTime() const {
         return m_deltaTime;
@@ -83,13 +79,13 @@ public:
         return m_optimalSteps;
     }
 
-    // Xóa bỏ Copy Constructor và Assignment Operator để đảm bảo tính ĐỘC NHẤT
+    // Xóa bỏ Copy Constructor và Assignment Operator
     GameEngine(const GameEngine&) = delete;
     void operator=(const GameEngine&) = delete;
 
     // --- CÁC HÀM GAMEPLAY LOGIC ---
-    void OnPlayerMove(); // Gọi khi nhân vật di chuyển
-    void OnShrineVisited(int row, int col); // Gọi khi nhân vật đến Trận Nhãn
+    void OnPlayerMove(); 
+    void OnShrineVisited(int row, int col); 
 
     int GetCurrentSteps() const {
         return m_currentSteps;
@@ -104,11 +100,21 @@ public:
     }
 
     // --- HỆ THỐNG HỒI TƯỞNG (UNDO) ---
-    void SaveState(); // Chụp ảnh trạng thái hiện tại
-    void Undo();      // Quay ngược thời gian
+    void SaveState(); 
+    void Undo();      
 
     // Hàm Reset game để chơi lại từ đầu
     void ResetGame();
+
+    // Hàm chuyển đổi trạng thái mượt mà
+    void SwitchState(GameState newState);
+
+    // --- HỆ THỐNG LEVEL (KHAI BÁO 1 LẦN DUY NHẤT Ở ĐÂY) ---
+    void LoadLevel(int levelIndex);
+    void NextLevel();
+
+    // Toggle Admin Mode
+    void ToggleAdminMode();
 
 private:
     // Private constructor cho Singleton
@@ -127,7 +133,7 @@ private:
     SDL_Window* m_pWindow;
     SDL_Renderer* m_pRenderer;
     
-    // Kích thước cửa sổ để giới hạn di chuyển
+    // Kích thước cửa sổ
     int m_windowWidth;
     int m_windowHeight;
 
@@ -137,15 +143,14 @@ private:
     // Con trỏ đến Map
     Map* m_pMap;
 
-    // Số bước tối ưu (Từ Thiên Cơ) để hiển thị trên UI
+    // Số bước tối ưu
     int m_optimalSteps;
 
     // Biến Gameplay
-    int m_currentSteps;      // Số bước người chơi đã đi
-    int m_shrinesCollected;  // Số Trận Nhãn đã mở
-    int m_totalShrines;      // Tổng số Trận Nhãn cần mở
+    int m_currentSteps;      
+    int m_shrinesCollected;  
+    int m_totalShrines;      
     
-    // Danh sách các vị trí Trận Nhãn đã mở (để không tính điểm 2 lần)
     std::vector<std::pair<int, int>> m_visitedShrinesList;
 
     // Ngăn xếp lịch sử (Stack)
@@ -154,14 +159,40 @@ private:
     // Biến lưu trạng thái hiện tại
     GameState m_currentState;
     
-    // Biến hiệu ứng nhấp nháy cho text "Press Enter"
+    // Biến hiệu ứng nhấp nháy
     float m_blinkTimer;
 
     // --- HỆ THỐNG PARALLAX SKY AAA ---
-    float m_cloudScrollX_1; // Lớp mây xa (chậm)
-    float m_cloudScrollX_2; // Lớp mây gần (nhanh)
+    float m_cloudScrollX_1; 
+    float m_cloudScrollX_2; 
     
-    // Tốc độ trôi
-    const float CLOUD_SPEED_1 = 20.0f; 
-    const float CLOUD_SPEED_2 = 50.0f;
+    const float CLOUD_SPEED_1 = 15.0f; 
+    const float CLOUD_SPEED_2 = 35.0f; 
+
+    // Hàm vẽ HUD
+    void DrawHUD();
+
+    // Biến quản lý Fade
+    float m_fadeAlpha; 
+    bool m_isFadingIn; 
+    bool m_isFadingOut; 
+
+    // --- BIẾN QUẢN LÝ CHUYỂN CẢNH AAA ---
+    GameState m_nextState; 
+    const float FADE_SPEED = 2.0f;
+
+    // --- BIẾN CHO VICTORY FLOW (AAA POLISH) ---
+    bool m_isWinningSequence; 
+    float m_winDelayTimer;    
+
+    // --- HỆ THỐNG UI AAA ---
+    void DrawStylishBox(int x, int y, int w, int h, std::string title = "");
+    void DrawButton(std::string text, int x, int y, int w, int h, bool isSelected);
+
+    int m_menuSelection; 
+    bool m_isAdminMode;
+
+    // --- HỆ THỐNG LEVEL (BIẾN DỮ LIỆU) ---
+    std::vector<std::string> m_levelFiles; 
+    int m_currentLevelIdx;                 
 };

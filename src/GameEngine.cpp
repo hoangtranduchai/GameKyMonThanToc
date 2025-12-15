@@ -120,10 +120,20 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     std::string tilePath = std::string(PROJECT_ROOT_PATH) + "/assets/images/tiles.png";
     if (!TextureManager::GetInstance()->Load(tilePath, "tiles", m_pRenderer)) return false;
 
-    // Khởi tạo Map
-    m_pMap = new Map();
-    std::string mapPath = std::string(PROJECT_ROOT_PATH) + "/assets/maps/level1.txt"; 
-    m_pMap->LoadMap(mapPath);
+    // --- KHỞI TẠO HỆ THỐNG LEVEL ---
+    m_levelFiles.clear();
+    // Đăng ký các màn chơi vào hệ thống
+    int CountLevels = 3; // Cập nhật số lượng level ở đây
+    for (int i = 1; i <= CountLevels; ++i) {
+        std::string levelFile = std::string(PROJECT_ROOT_PATH) + "/assets/levels/level" + std::to_string(i) + ".txt";
+        m_levelFiles.push_back(levelFile);
+    }
+
+    m_currentLevelIdx = 0; // Bắt đầu từ Level 1
+    m_isAdminMode = false; // Mặc định tắt Admin
+
+    // Load Level đầu tiên
+    LoadLevel(m_currentLevelIdx);
 
     // --- AUTO FIT LOGIC ---
     // Lấy kích thước thực tế của map vừa load
@@ -189,6 +199,16 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Ở đây tôi giả định bạn sẽ làm việc đó.
     TextureManager::GetInstance()->LoadFont(fontPath, "gui_font", fontSize);
 
+    // --- LOAD MENU ART (AAA) ---
+    // Đảm bảo file player.png nằm trong assets/images/
+    std::string menuBgPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player.png"; 
+    if (!TextureManager::GetInstance()->Load(menuBgPath, "menu_background", m_pRenderer)) {
+        std::cout << "[Loi Critical] Khong tim thay Menu Art: " << menuBgPath << std::endl;
+    }
+
+    // Khởi tạo biến Menu
+    m_menuSelection = 0; // Mặc định chọn nút đầu tiên
+
     // --- [AAA SYSTEM] NẠP SPRITE SHEET PLAYER ---
     // Định nghĩa các hành động và hướng tương ứng với tên file ảnh
     std::string actions[] = {"idle", "run"};
@@ -198,10 +218,10 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     for (const auto& act : actions) {
         for (const auto& dir : directions) {
             // Xây dựng đường dẫn file: assets/images/player/[action]_[dir].png
-            
             // Ví dụ path: assets/images/player/idle_down.png
             std::string fileName = act + "_" + dir + ".png";
             
+            // Đường dẫn phẳng (Flat path) như bạn đã upload
             std::string fullPath = std::string(PROJECT_ROOT_PATH) + "/assets/images/player/" + fileName;
             
             // ID trong TextureManager: "player_idle_down", "player_run_left"...
@@ -215,7 +235,6 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
 
     // --- KHỞI TẠO PLAYER ---
     // Lưu ý: TextureID ban đầu là "player_idle_down"
-    // Kích thước frame cần đo chính xác từ ảnh (Ví dụ ảnh RUN 8 frame rộng 768px -> 1 frame = 96px)
     int frameW = 96;
     int frameH = 80;
 
@@ -225,7 +244,15 @@ bool GameEngine::Init(const char* title, int x, int y, int w, int h, bool fullsc
     // Tạo Player tại vị trí bắt đầu
     m_pPlayer = new Player(new LoaderParams(startPos.col * tileSize, startPos.row * tileSize, frameW, frameH, "player_idle_down"));
 
-    std::cout << "Player spawned at Grid [" << startPos.row << "," << startPos.col << "]" << std::endl;
+    m_currentState = STATE_MENU;
+    m_nextState = STATE_MENU;
+    m_fadeAlpha = 1.0f; // Bắt đầu là màn hình đen
+    m_isFadingIn = true; // Bắt đầu game bằng hiệu ứng sáng dần
+    m_isFadingOut = false;
+
+    // Khởi tạo biến Flow
+    m_isWinningSequence = false;
+    m_winDelayTimer = 0.0f;
 
     std::cout << "Game Engine & Player Objects khoi tao thanh cong!" << std::endl;
     m_bRunning = true;
@@ -322,12 +349,29 @@ void GameEngine::HandleEvents() {
         // --- XỬ LÝ THEO TRẠNG THÁI ---
         switch (m_currentState) {
             case STATE_MENU:
-                // Nhấn ENTER để BẮT ĐẦU
-                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN) {
-                    m_currentState = STATE_PLAY;
-                    SoundManager::GetInstance()->PlaySFX("collect"); // Tiếng xác nhận
-                    // Bắt đầu nhạc nền game
-                    SoundManager::GetInstance()->PlayMusic("bgm");
+                // Điều hướng Menu bằng phím mũi tên
+                if (event.key.keysym.sym == SDLK_UP) {
+                    m_menuSelection--;
+                    if (m_menuSelection < 0) m_menuSelection = 1; // Loop về cuối
+                    SoundManager::GetInstance()->PlaySFX("step");
+                }
+                if (event.key.keysym.sym == SDLK_DOWN) {
+                    m_menuSelection++;
+                    if (m_menuSelection > 1) m_menuSelection = 0; // Loop về đầu
+                    SoundManager::GetInstance()->PlaySFX("step");
+                }
+                
+                // Chọn (Enter/Space)
+                if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_SPACE) {
+                    SoundManager::GetInstance()->PlaySFX("collect"); // Âm thanh chọn
+                    
+                    if (m_menuSelection == 0) { // Nút Play
+                        // ResetGame(); // Bỏ comment nếu muốn reset mỗi khi bấm Play
+                        SwitchState(STATE_PLAY);
+                    } 
+                    else if (m_menuSelection == 1) { // Nút Quit
+                        m_bRunning = false;
+                    }
                 }
                 break;
 
@@ -336,15 +380,58 @@ void GameEngine::HandleEvents() {
                 if (event.type == SDL_KEYDOWN) {
                     // Undo
                     if (event.key.keysym.sym == SDLK_u) Undo();
-                    // Di chuyển (đã xử lý trong Player::HandleInput gọi ở Update, 
-                    // nhưng Player chỉ nên nhận input khi ở State Play)
+                
+                    // Bấm ESC để TẠM DỪNG
+                    if (event.key.keysym.sym == SDLK_ESCAPE) {
+                        SwitchState(STATE_PAUSE);
+                    }
+
+                    // --- ADMIN CHEATS (QUYỀN LỰC TỐI THƯỢNG) ---
+                    // Chỉ hoạt động khi bật F1
+                    if (m_isAdminMode) {
+                        // Phím N: Next Level (Skip màn chơi ngay lập tức)
+                        if (event.key.keysym.sym == SDLK_n) {
+                            SoundManager::GetInstance()->PlaySFX("win_sound");
+                            NextLevel();
+                        }
+                    }
+                }
+                break;
+            
+            case STATE_PAUSE:
+                if (event.type == SDL_KEYDOWN) {
+                    // ESC: Tiếp tục
+                    if (event.key.keysym.sym == SDLK_ESCAPE) {
+                        m_currentState = STATE_PLAY;
+                    }
+                    // M: Về Menu chính
+                    if (event.key.keysym.sym == SDLK_m) {
+                        SwitchState(STATE_MENU);
+                    }
+                    // Q: Thoát Game
+                    if (event.key.keysym.sym == SDLK_q) {
+                        m_bRunning = false;
+                    }
                 }
                 break;
 
             case STATE_WIN:
-                // Nhấn R để CHƠI LẠI (Replay)
-                if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r) {
-                    ResetGame();
+                if (event.type == SDL_KEYDOWN) {
+                    // Phím Enter hoặc Space: Qua màn tiếp theo
+                    if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_SPACE) {
+                        NextLevel(); 
+                    }
+
+                    // Phím R: Chơi lại màn hiện tại
+                    if (event.key.keysym.sym == SDLK_r) {
+                        ResetGame(); // Reset dữ liệu
+                        SwitchState(STATE_PLAY); // Chuyển cảnh lại vào game
+                    }
+
+                    // Phím M: Về Menu chính
+                    if (event.key.keysym.sym == SDLK_m) {
+                        SwitchState(STATE_MENU);
+                    }
                 }
                 break;
         }
@@ -364,30 +451,81 @@ void GameEngine::Update() {
         m_deltaTime = 0.05f;
     }
     
-    // Chỉ update nhân vật khi đang CHƠI
-    if (m_currentState == STATE_PLAY) {
-        if (m_pPlayer) m_pPlayer->Update();
+    // --- LOGIC CHUYỂN CẢNH (TRANSITION SYSTEM) ---
+    if (m_isFadingOut) {
+        m_fadeAlpha += FADE_SPEED * m_deltaTime;
+        if (m_fadeAlpha >= 1.0f) {
+            m_fadeAlpha = 1.0f;
+            m_currentState = m_nextState; // CHÍNH THỨC ĐỔI TRẠNG THÁI
+            m_isFadingOut = false;
+            m_isFadingIn = true; // Bắt đầu sáng lại
+            
+            // Nếu vào lại MENU hoặc PLAY từ đầu, có thể cần Reset nhạc/Game tại đây
+            if (m_currentState == STATE_PLAY && m_nextState == STATE_PLAY) {
+                 // Logic Reset nếu cần
+            }
+        }
+        return; // Đang chuyển cảnh thì KHÔNG update logic game
     }
 
-    // Hiệu ứng nhấp nháy cho Menu và Win screen
-    if (m_currentState != STATE_PLAY) {
-        m_blinkTimer += m_deltaTime;
-        if (m_blinkTimer > 1.0f) m_blinkTimer = 0.0f;
+    if (m_isFadingIn) {
+        m_fadeAlpha -= FADE_SPEED * m_deltaTime;
+        if (m_fadeAlpha <= 0.0f) {
+            m_fadeAlpha = 0.0f;
+            m_isFadingIn = false;
+        }
     }
 
-    ParticleSystem::GetInstance()->Update(m_deltaTime);
+    // --- LOGIC THEO TRẠNG THÁI ---
+    switch (m_currentState) {
+        case STATE_MENU:
+        case STATE_WIN:
+            m_blinkTimer += m_deltaTime;
+            if (m_blinkTimer > 1.0f) m_blinkTimer = 0.0f;
+            break;
 
-    // Cập nhật vị trí mây trôi
-    m_cloudScrollX_1 -= CLOUD_SPEED_1 * m_deltaTime;
-    m_cloudScrollX_2 -= CLOUD_SPEED_2 * m_deltaTime;
+        case STATE_PLAY: {
+            // Chỉ Update Game khi ĐANG CHƠI (Không Pause)
+            if (m_pPlayer) m_pPlayer->Update();
+            ParticleSystem::GetInstance()->Update(m_deltaTime);
+            
+            // Mây trôi
+            m_cloudScrollX_1 -= CLOUD_SPEED_1 * m_deltaTime;
+            m_cloudScrollX_2 -= CLOUD_SPEED_2 * m_deltaTime;
+            // Reset khi trôi hết kích thước ảnh (Giả sử ảnh rộng 1280px hoặc lấy width từ TextureManager)
+            // Ở đây ta giả định ảnh rộng ít nhất bằng màn hình logic.
+            int mapW = m_pMap->GetMapPixelWidth(); // Hoặc lấy width cửa sổ
+            
+            // Logic cuộn vô tận
+            if (m_cloudScrollX_1 <= -mapW) m_cloudScrollX_1 = 0;
+            if (m_cloudScrollX_2 <= -mapW) m_cloudScrollX_2 = 0;
+            break;
+        }
 
-    // Reset khi trôi hết kích thước ảnh (Giả sử ảnh rộng 1280px hoặc lấy width từ TextureManager)
-    // Ở đây ta giả định ảnh rộng ít nhất bằng màn hình logic.
-    int mapW = m_pMap->GetMapPixelWidth(); // Hoặc lấy width cửa sổ
-    
-    // Logic cuộn vô tận
-    if (m_cloudScrollX_1 <= -mapW) m_cloudScrollX_1 = 0;
-    if (m_cloudScrollX_2 <= -mapW) m_cloudScrollX_2 = 0;
+        case STATE_PAUSE:
+            // KHI PAUSE: KHÔNG update Player, Map, Particles.
+            // Game "đóng băng" hoàn toàn. 
+            // Chỉ update các hiệu ứng riêng của Menu Pause nếu có.
+            break;
+    }
+
+    // --- LOGIC VICTORY SEQUENCE ---
+    if (m_isWinningSequence) {
+        m_winDelayTimer -= m_deltaTime;
+        
+        // Tạo thêm hạt nổ tưng bừng trong lúc chờ
+        if ((int)(m_winDelayTimer * 10) % 2 == 0) { // Cứ mỗi vài frame
+             int w = m_pMap->GetMapPixelWidth();
+             int h = m_pMap->GetMapPixelHeight();
+             // Bắn pháo hoa ngẫu nhiên
+             ParticleSystem::GetInstance()->Emit(rand() % w, rand() % h, 10, {255, 215, 0, 255});
+        }
+
+        if (m_winDelayTimer <= 0.0f) {
+            m_currentState = STATE_WIN; // Chuyển cảnh chính thức
+            m_isWinningSequence = false;
+        }
+    }
 }
 
 void GameEngine::OnPlayerMove() {
@@ -420,6 +558,12 @@ void GameEngine::ResetGame() {
 
     // 5. Chuyển về trạng thái Menu hoặc Play
     m_currentState = STATE_PLAY; // Hoặc STATE_MENU nếu muốn về menu
+
+    m_isWinningSequence = false;
+    m_winDelayTimer = 0.0f;
+
+    // Bật lại nhạc nền
+    SoundManager::GetInstance()->PlayMusic("bgm");
     
     std::cout << "[He thong] Game da duoc Reset!" << std::endl;
 }
@@ -461,118 +605,268 @@ void GameEngine::OnShrineVisited(int row, int col) {
 
     // Kiểm tra Chiến Thắng
     if (m_shrinesCollected >= m_totalShrines) {
-        m_currentState = STATE_WIN; // <--- CHUYỂN TRẠNG THÁI
-        SoundManager::GetInstance()->PlaySFX("win_sound"); // Nếu có
+        // KHÔNG chuyển state ngay lập tức!
+        if (!m_isWinningSequence) {
+            m_isWinningSequence = true;
+            m_winDelayTimer = 2.0f; // Chờ 2 giây để người chơi ngắm hiệu ứng
+            
+            // Phát âm thanh chiến thắng
+            SoundManager::GetInstance()->PlaySFX("win_sound");
+            
+            // Fade out nhạc nền trong 2 giây (Tắt dần)
+            Mix_FadeOutMusic(2000); 
+            
+            std::cout << ">>> VICTORY SEQUENCE STARTED! <<<" << std::endl;
+        }
     }
 }
 
-// Render Đồ họa
+// Vẽ HUD
+void GameEngine::DrawHUD() {
+    int w = m_windowWidth;
+    
+    // 1. THANH TOP BAR (CINEMATIC BAR)
+    SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_BLEND);
+    // Gradient đen mờ -> Giúp chữ dễ đọc tuyệt đối
+    SDL_Rect bar = {0, 0, w, 50};
+    SDL_SetRenderDrawColor(m_pRenderer, 10, 10, 10, 240); // Gần như đen kịt
+    SDL_RenderFillRect(m_pRenderer, &bar);
+    
+    // Đường chỉ vàng ngăn cách HUD và Game
+    SDL_SetRenderDrawColor(m_pRenderer, 255, 215, 0, 255);
+    SDL_RenderDrawLine(m_pRenderer, 0, 50, w, 50);
+    
+    SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_NONE);
+
+    // 2. HIỂN THỊ THÔNG SỐ (Dùng màu tương phản cao)
+    SDL_Color gold = {255, 215, 0, 255};
+    SDL_Color white = {255, 255, 255, 255};
+    SDL_Color cyan = {0, 255, 255, 255};
+    SDL_Color red  = {255, 80, 80, 255};
+
+    // --- LEFT: THIÊN MỆNH (BƯỚC CHÂN) ---
+    std::string stepStr = "THIEN MENH: " + std::to_string(m_currentSteps) + " / " + std::to_string(m_optimalSteps);
+    // Nếu đi quá số bước -> Chữ đỏ cảnh báo
+    SDL_Color stepColor = (m_currentSteps <= m_optimalSteps) ? white : red;
+    
+    // Vẽ bóng chữ (Shadow) để tạo khối 3D
+    TextureManager::GetInstance()->DrawText("gui_font", stepStr, 32, 12, {0,0,0,255}, m_pRenderer); // Bóng đen
+    TextureManager::GetInstance()->DrawText("gui_font", stepStr, 30, 10, stepColor, m_pRenderer);   // Chữ chính
+
+    // --- CENTER: KHAI MỞ (TIẾN ĐỘ) ---
+    std::string shrineStr = "TRAN NHAN: " + std::to_string(m_shrinesCollected) + " / " + std::to_string(m_totalShrines);
+    // Căn giữa (Hardcode ước lượng w/2 - 120)
+    TextureManager::GetInstance()->DrawText("gui_font", shrineStr, w/2 - 118, 12, {0,0,0,255}, m_pRenderer); // Bóng
+    TextureManager::GetInstance()->DrawText("gui_font", shrineStr, w/2 - 120, 10, cyan, m_pRenderer);        // Chữ Cyan sáng rực
+
+    // --- RIGHT: PHÍM TẮT ---
+    std::string helpStr = "[U] HOI TUONG   [ESC] MENU";
+    TextureManager::GetInstance()->DrawText("gui_font", helpStr, w - 318, 12, {0,0,0,255}, m_pRenderer);
+    TextureManager::GetInstance()->DrawText("gui_font", helpStr, w - 320, 10, gold, m_pRenderer);
+}
+
+// ---------------------------------------------------------------------------
+// RENDER LOOP - VẼ TOÀN BỘ THẾ GIỚI GAME
+// ---------------------------------------------------------------------------
 void GameEngine::Render() {
     SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 255);
     SDL_RenderClear(m_pRenderer);
 
-    // Lấy kích thước màn hình logic
-    int w = m_pMap->GetMapPixelWidth();
+    // Lấy kích thước màn hình
+    int w = m_pMap->GetMapPixelWidth(); // Hoặc m_windowWidth nếu dùng Auto-Scale
     int h = m_pMap->GetMapPixelHeight();
 
-    // 1. Vẽ Background tĩnh (Màu trời)
-    // Nếu bạn có ảnh background.png là bầu trời xanh, vẽ nó trước.
-    TextureManager::GetInstance()->Draw("background", 0, 0, w, h, m_pRenderer);
-
-    // 2. --- VẼ MÂY TRÔI (PARALLAX LAYERS) ---
-    // Để vẽ mây lặp lại vô tận, ta cần vẽ 2 tấm ảnh nối đuôi nhau cho mỗi lớp.
-    
-    // Lớp 1: Xa, Chậm, Rõ nét hơn
-    TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1, 0, w, h, m_pRenderer);
-    TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1 + w, 0, w, h, m_pRenderer); // Ảnh nối đuôi
-
-    // // Lớp 2: Gần, Nhanh, Mờ ảo (Sương mù)
-    // // Mẹo AAA: Vẽ lớp này hơi to hơn hoặc lệch đi để tạo sự khác biệt
-    // // Cần set Alpha cho lớp này để nhìn xuyên thấu
-    SDL_Texture* cloudTex = TextureManager::GetInstance()->GetTexture("clouds");
-    if (cloudTex) {
-        SDL_SetTextureAlphaMod(cloudTex, 150); // Độ trong suốt 150/255
-        SDL_SetTextureColorMod(cloudTex, 200, 240, 255); // Ám xanh nhẹ
+    // --- MÁY TRẠNG THÁI HÌNH ẢNH (VISUAL STATE MACHINE) ---
+    switch (m_currentState) {
         
-        // Vẽ lớp 2 (Lệch một chút để không trùng khớp hoàn toàn với lớp 1)
-        TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_2, 0, w, h, m_pRenderer);
-        TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_2 + w, 0, w, h, m_pRenderer);
-        
-        // Reset lại màu/alpha để không ảnh hưởng lần vẽ sau (Lớp 1 ở frame sau)
-        SDL_SetTextureAlphaMod(cloudTex, 255);
-        SDL_SetTextureColorMod(cloudTex, 255, 255, 255);
+        // =================================================================
+        // 1. MENU SCREEN: TUYỆT TÁC MỞ ĐẦU
+        // =================================================================
+        case STATE_MENU: {
+            // A. Lớp Nền: Background Art (player.png)
+            // Vẽ full màn hình
+            TextureManager::GetInstance()->Draw("menu_background", 0, 0, w, h, m_pRenderer);
+            
+            // B. Lớp Khí Quyển: Mây Trôi (Vẽ NGAY SAU nền, TRƯỚC UI)
+            // Lớp 1 (Xa)
+            TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1, 0, w, h, m_pRenderer);
+            TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1 + w, 0, w, h, m_pRenderer);
+            
+            // Lớp 2 (Gần - Mờ ảo sương khói)
+            SDL_Texture* cloudTex = TextureManager::GetInstance()->GetTexture("clouds");
+            if (cloudTex) {
+                // Giảm Alpha xuống 80 để mây chỉ là lớp sương mờ, không che mất Art nhân vật
+                SDL_SetTextureAlphaMod(cloudTex, 80); 
+                TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_2, 0, w, h, m_pRenderer);
+                TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_2 + w, 0, w, h, m_pRenderer);
+                SDL_SetTextureAlphaMod(cloudTex, 255); // Reset ngay lập tức
+            }
+
+            // C. Lớp Giao Diện (UI Layer) - Vẽ đè lên tất cả
+            
+            // --- LOGO GAME: Khung Tiêu Đề Hoành Tráng ---
+            int titleBoxW = 600;
+            int titleBoxH = 120;
+            int titleY = h/5; // Vị trí 20% từ trên xuống
+            
+            // Vẽ khung rỗng (chỉ viền và nền mờ)
+            DrawStylishBox((w - titleBoxW)/2, titleY, titleBoxW, titleBoxH, ""); 
+            
+            // Vẽ Chữ Tiêu Đề (Hiệu ứng Bóng Đổ Kép - Double Drop Shadow)
+            int titleTextX = w/2 - 190; 
+            int titleTextY = titleY + 40;
+            // Bóng đen đậm
+            TextureManager::GetInstance()->DrawText("gui_font", "KY MON THAN TOC", titleTextX + 4, titleTextY + 4, {0,0,0,200}, m_pRenderer); 
+            // Viền sáng nhẹ
+            TextureManager::GetInstance()->DrawText("gui_font", "KY MON THAN TOC", titleTextX + 2, titleTextY + 2, {200,100,0,255}, m_pRenderer); 
+            // Chữ chính màu Vàng Kim
+            TextureManager::GetInstance()->DrawText("gui_font", "KY MON THAN TOC", titleTextX, titleTextY, {255, 215, 0, 255}, m_pRenderer);
+
+            // --- MENU BUTTONS ---
+            int btnW = 350; 
+            int btnH = 60;
+            int startY = h/2 + 60; // Dịch xuống dưới một chút để không che nhân vật
+
+            // Nút 1: Nhập Thế
+            DrawButton("NHAP THE (Play)", (w - btnW)/2, startY, btnW, btnH, m_menuSelection == 0);
+            
+            // Nút 2: Rời Khỏi
+            DrawButton("ROI KHOI (Quit)", (w - btnW)/2, startY + 80, btnW, btnH, m_menuSelection == 1);
+
+            // Footer
+            TextureManager::GetInstance()->DrawText("gui_font", "Phien ban AAA - PBL2 Project", 20, h - 40, {150, 150, 150, 255}, m_pRenderer);
+            
+            if (m_isAdminMode) {
+                TextureManager::GetInstance()->DrawText("gui_font", "[ADMIN MODE ONLINE]", w - 280, h - 40, {255, 50, 50, 255}, m_pRenderer);
+            }
+            break;
+        }
+
+        // =================================================================
+        // 2. PLAY SCREEN: TRẢI NGHIỆM MƯỢT MÀ
+        // =================================================================
+        case STATE_PLAY: {
+            // Lớp 1: Nền trời
+            TextureManager::GetInstance()->Draw("background", 0, 0, w, h, m_pRenderer);
+            
+            // Lớp 2: Mây trôi (Xa)
+            TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1, 0, w, h, m_pRenderer);
+            TextureManager::GetInstance()->Draw("clouds", (int)m_cloudScrollX_1 + w, 0, w, h, m_pRenderer);
+
+            // Lớp 3: Thế giới Game (Map -> Player -> VFX)
+            if (m_pMap) m_pMap->DrawMap();
+            if (m_pPlayer) m_pPlayer->Draw();
+            ParticleSystem::GetInstance()->Render(m_pRenderer); // Hạt năng lượng vẽ đè lên tất cả
+            
+            // Lớp 4: UI (HUD)
+            DrawHUD(); 
+            break;
+        }
+
+        // =================================================================
+        // 3. PAUSE SCREEN: TĨNH LẶNG & RÕ RÀNG
+        // =================================================================
+        case STATE_PAUSE: {
+            // Vẽ lại toàn bộ màn hình Play làm nền (đóng băng)
+            TextureManager::GetInstance()->Draw("background", 0, 0, w, h, m_pRenderer);
+            if (m_pMap) m_pMap->DrawMap();
+            if (m_pPlayer) m_pPlayer->Draw();
+            DrawHUD(); // Vẫn hiện HUD mờ bên dưới
+            
+            // LỚP PHỦ TỐI (DIMMING OVERLAY)
+            SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 200); // Đen đậm (80% opacity)
+            SDL_RenderFillRect(m_pRenderer, NULL);
+            
+            // HỘP THOẠI PAUSE
+            int boxW = 500; int boxH = 320;
+            int boxX = (w - boxW)/2;
+            int boxY = (h - boxH)/2;
+            DrawStylishBox(boxX, boxY, boxW, boxH, "--- TAM DUNG ---");
+            
+            // Nội dung hướng dẫn (Căn giữa Box)
+            int contentY = boxY + 100;
+            int contentX = w/2 - 130;
+            SDL_Color white = {255, 255, 255, 255};
+            SDL_Color gray = {200, 200, 200, 255};
+            
+            TextureManager::GetInstance()->DrawText("gui_font", "[ESC]  TIEP TUC", contentX, contentY, white, m_pRenderer);
+            TextureManager::GetInstance()->DrawText("gui_font", "[M]    VE MENU", contentX, contentY + 60, gray, m_pRenderer);
+            TextureManager::GetInstance()->DrawText("gui_font", "[Q]    THOAT GAME", contentX, contentY + 120, gray, m_pRenderer);
+            break;
+        }
+
+        // =================================================================
+        // 4. WIN SCREEN: VINH QUANG TỘT ĐỈNH
+        // =================================================================
+        case STATE_WIN: {
+            // Nền: Art Menu tái sử dụng (hoặc ảnh Win riêng nếu có)
+            TextureManager::GetInstance()->Draw("menu_background", 0, 0, w, h, m_pRenderer);
+
+            // Lớp phủ tối cực đậm để tôn vinh bảng kết quả
+            SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, 220);
+            SDL_RenderFillRect(m_pRenderer, NULL);
+
+            // HỘP THOẠI CHIẾN THẮNG (Lớn hơn bình thường)
+            int boxW = 700; int boxH = 400;
+            DrawStylishBox((w - boxW)/2, (h - boxH)/2, boxW, boxH, "");
+            
+            // Tiêu đề lớn (Vàng kim rực rỡ)
+            SDL_Color gold = {255, 215, 0, 255};
+            TextureManager::GetInstance()->DrawText("gui_font", "THIEN MENH HOAN TAT!", w/2 - 250, h/2 - 120, gold, m_pRenderer);
+
+            // Đánh giá Rank (S/A)
+            std::string rankStr;
+            SDL_Color rankColor;
+            if (m_currentSteps <= m_optimalSteps) {
+                rankStr = "DANH GIA: TUYET DINH (S)";
+                rankColor = {0, 255, 255, 255}; // Cyan (Hoàn hảo)
+            } else {
+                rankStr = "DANH GIA: HOAN THANH (A)";
+                rankColor = {200, 200, 200, 255}; // Bạc (Khá)
+            }
+            
+            TextureManager::GetInstance()->DrawText("gui_font", rankStr, w/2 - 220, h/2 - 40, rankColor, m_pRenderer);
+
+            // --- CẬP NHẬT HƯỚNG DẪN MỚI ---
+            
+            // Nếu còn level tiếp theo -> Hiện "Next Level"
+            if (m_currentLevelIdx < m_levelFiles.size() - 1) {
+                // Hiệu ứng nhấp nháy cho nút quan trọng nhất
+                if (m_blinkTimer < 0.5f) {
+                    TextureManager::GetInstance()->DrawText("gui_font", "[ENTER]  MAN TIEP THEO >>", w/2 - 180, h/2 + 50, {0, 255, 255, 255}, m_pRenderer);
+                }
+            } else {
+                // Nếu là màn cuối
+                if (m_blinkTimer < 0.5f) {
+                    TextureManager::GetInstance()->DrawText("gui_font", "CHUC MUNG! BAN DA PHA DAO!", w/2 - 180, h/2 + 50, {255, 215, 0, 255}, m_pRenderer);
+                }
+            }
+
+            TextureManager::GetInstance()->DrawText("gui_font", "[R] Choi Lai    [M] Menu", w/2 - 140, h/2 + 100, {150, 150, 150, 255}, m_pRenderer);
+
+            break;
+        }
     }
 
-    // --- VẼ HIỆU ỨNG HẠT (VFX) ---
-    ParticleSystem::GetInstance()->Render(m_pRenderer);
-
-    SDL_Color gold = {255, 215, 0, 255};
-    SDL_Color white = {255, 255, 255, 255};
-    
-    switch (m_currentState) {
-        case STATE_MENU: {
-            // 1. Vẽ Background mờ ảo (có thể vẽ Map làm nền)
-            // if (m_pMap) m_pMap->DrawMap();
-            
-            // 2. Vẽ Tiêu Đề Lớn "KỲ MÔN THẦN TỐC"
-            // (Bạn nên tạo font size lớn hơn trong Init cho đẹp)
-            TextureManager::GetInstance()->DrawText("gui_font", "KY MON THAN TOC", w/2 - 300, h/3, gold, m_pRenderer);
-            
-            // 3. Vẽ dòng chữ nhấp nháy
-            if (m_blinkTimer < 0.5f) {
-                TextureManager::GetInstance()->DrawText("gui_font", "Nhan ENTER de Nhap The", w/2 - 250, h/2, white, m_pRenderer);
-            }
-            break;
-        }
-
-        case STATE_PLAY: {
-            // 1. Vẽ Map
-            if (m_pMap) m_pMap->DrawMap();
-
-            // 2. Vẽ Player
-            if (m_pPlayer) m_pPlayer->Draw();
-            
-            // 3. Vẽ Hạt (VFX)
-            ParticleSystem::GetInstance()->Render(m_pRenderer);
-            
-            // 4. Vẽ HUD
-            // --- VẼ HUD (GIAO DIỆN NGƯỜI DÙNG) ---
-            // Màu chữ: Trắng sáng (hoặc Vàng kim loại cho sang trọng)
-            SDL_Color textColor = {255, 215, 0, 255}; // Gold Color
-
-            // Chuẩn bị nội dung text
-            std::string stepText = "Buoc: " + std::to_string(m_currentSteps) + " / " + std::to_string(m_optimalSteps);
-            std::string shrineText = "Tran Nhan: " + std::to_string(m_shrinesCollected) + " / " + std::to_string(m_totalShrines);
-
-            // Lấy kích thước Map để căn chỉnh vị trí (Vẽ ở góc trên trái)
-            int margin = m_pMap->GetMapPixelHeight() / 30;
-            
-            TextureManager::GetInstance()->DrawText("gui_font", stepText, margin, margin, textColor, m_pRenderer);
-            TextureManager::GetInstance()->DrawText("gui_font", shrineText, margin, margin * 3, textColor, m_pRenderer);
-            break;
-        }
-
-        case STATE_WIN: {
-            // Vẽ Map và Player đứng yên làm nền
-            // (Giữ nguyên thứ tự Map -> Player -> VFX -> UI)
-            if (m_pMap) m_pMap->DrawMap();
-            if (m_pPlayer) m_pPlayer->Draw();
-            ParticleSystem::GetInstance()->Render(m_pRenderer);
-
-            // Vẽ bảng chiến thắng
-            TextureManager::GetInstance()->DrawText("gui_font", "THIEN MENH HOAN TAT!", w/2 - 300, h/3, gold, m_pRenderer);
-            
-            std::string resultStr = "Thanh tich: " + std::to_string(m_currentSteps) + " buoc";
-            TextureManager::GetInstance()->DrawText("gui_font", resultStr, w/2 - 200, h/2, white, m_pRenderer);
-
-            if (m_blinkTimer < 0.5f) {
-                TextureManager::GetInstance()->DrawText("gui_font", "Nhan 'R' de Choi Lai", w/2 - 220, h/2 + 150, white, m_pRenderer);
-            }
-            break;
-        }
+    // --- HIỆU ỨNG CHUYỂN CẢNH (FADE IN/OUT) ---
+    // Vẽ một màn hình đen với độ trong suốt thay đổi để làm dịu mắt khi chuyển cảnh
+    if (m_fadeAlpha > 0.0f) {
+        SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_BLEND);
+        Uint8 alphaByte = (Uint8)(m_fadeAlpha * 255);
+        SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, alphaByte);
+        SDL_RenderFillRect(m_pRenderer, NULL);
+        SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_NONE);
     }
 
     SDL_RenderPresent(m_pRenderer);
+}
+
+void GameEngine::SwitchState(GameState newState) {
+    m_nextState = newState;
+    m_isFadingOut = true; // Bắt đầu hiệu ứng tối dần
+    // Khi màn hình đen kịt (Alpha = 1), ta sẽ đổi m_currentState
 }
 
 // Dọn dẹp Tài nguyên
@@ -608,4 +902,165 @@ void GameEngine::Quit() {
     m_bRunning = false;
     
     std::cout << "Game Engine đã dọn dẹp và kết thúc!" << std::endl;
+}
+
+// ---------------------------------------------------------------------------
+// HỆ THỐNG UI AAA - TUYỆT KỸ VẼ GIAO DIỆN (PROCEDURAL UI RENDERING)
+// ---------------------------------------------------------------------------
+
+void GameEngine::DrawStylishBox(int x, int y, int w, int h, std::string title) {
+    // 1. LỚP NỀN (BACKGROUND): Hiệu ứng kính tối màu (Glassmorphism)
+    SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_BLEND);
+    // Màu: Nâu đen pha tím than (Rất sang trọng cho game tiên hiệp)
+    SDL_SetRenderDrawColor(m_pRenderer, 20, 15, 30, 235); 
+    SDL_Rect bg = {x, y, w, h};
+    SDL_RenderFillRect(m_pRenderer, &bg);
+
+    // 2. KHUNG VIỀN (BORDERS): Vàng Kim Loại (Metallic Gold)
+    SDL_SetRenderDrawColor(m_pRenderer, 255, 215, 0, 255); 
+    SDL_Rect border = {x, y, w, h};
+    SDL_RenderDrawRect(m_pRenderer, &border);
+    
+    // Viền nội (Inner Border) tạo chiều sâu 3D
+    SDL_SetRenderDrawColor(m_pRenderer, 200, 160, 0, 150); // Vàng tối hơn
+    SDL_Rect border2 = {x+4, y+4, w-8, h-8};
+    SDL_RenderDrawRect(m_pRenderer, &border2);
+
+    // 3. HỌA TIẾT 4 GÓC (CORNER ACCENTS) - Tăng độ tinh xảo
+    SDL_SetRenderDrawColor(m_pRenderer, 0, 255, 255, 255); // Màu Cyan điểm xuyết
+    int s = 25; // Độ dài cạnh góc
+    int t = 3;  // Độ dày nét
+    
+    // Vẽ 4 góc thủ công
+    SDL_Rect c1 = {x, y, s, t}; SDL_RenderFillRect(m_pRenderer, &c1); // Top-Left H
+    SDL_Rect c2 = {x, y, t, s}; SDL_RenderFillRect(m_pRenderer, &c2); // Top-Left V
+    
+    SDL_Rect c3 = {x + w - s, y, s, t}; SDL_RenderFillRect(m_pRenderer, &c3); // Top-Right H
+    SDL_Rect c4 = {x + w - t, y, t, s}; SDL_RenderFillRect(m_pRenderer, &c4); // Top-Right V
+
+    SDL_Rect c5 = {x, y + h - t, s, t}; SDL_RenderFillRect(m_pRenderer, &c5); // Bot-Left H
+    SDL_Rect c6 = {x, y + h - s, t, s}; SDL_RenderFillRect(m_pRenderer, &c6); // Bot-Left V
+
+    SDL_Rect c7 = {x + w - s, y + h - t, s, t}; SDL_RenderFillRect(m_pRenderer, &c7); // Bot-Right H
+    SDL_Rect c8 = {x + w - t, y + h - s, t, s}; SDL_RenderFillRect(m_pRenderer, &c8); // Bot-Right V
+
+    SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_NONE);
+
+    // 4. TIÊU ĐỀ HỘP THOẠI (HEADER)
+    if (!title.empty()) {
+        // Vẽ đường gạch chân phân cách tiêu đề
+        SDL_SetRenderDrawColor(m_pRenderer, 255, 215, 0, 100);
+        SDL_RenderDrawLine(m_pRenderer, x + 20, y + 50, x + w - 20, y + 50);
+
+        // Vẽ Text Tiêu đề (Căn giữa)
+        SDL_Color gold = {255, 215, 0, 255};
+        // Ước lượng width text để căn giữa (Giả sử 1 char ~ 15px với font to)
+        int textX = x + (w - (int)title.length() * 12) / 2; 
+        TextureManager::GetInstance()->DrawText("gui_font", title, textX, y + 15, gold, m_pRenderer);
+    }
+}
+
+void GameEngine::DrawButton(std::string text, int x, int y, int w, int h, bool isSelected) {
+    SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_BLEND);
+    
+    if (isSelected) {
+        // --- HIỆU ỨNG GLOW KHI CHỌN (HOVER STATE) ---
+        // Vầng hào quang Cyan tỏa ra ngoài
+        SDL_SetRenderDrawColor(m_pRenderer, 0, 255, 255, 100); 
+        SDL_Rect glow = {x-5, y-5, w+10, h+10};
+        SDL_RenderFillRect(m_pRenderer, &glow);
+        
+        // Nền nút sáng hơn (Xanh rêu đậm)
+        SDL_SetRenderDrawColor(m_pRenderer, 0, 80, 80, 240); 
+        
+        // Mũi tên chỉ dẫn phong cách RPG
+        TextureManager::GetInstance()->DrawText("gui_font", ">>", x - 35, y + (h/2) - 12, {0, 255, 255, 255}, m_pRenderer);
+    } else {
+        // --- TRẠNG THÁI BÌNH THƯỜNG (NORMAL STATE) ---
+        // Nền xám đen
+        SDL_SetRenderDrawColor(m_pRenderer, 40, 40, 50, 220); 
+    }
+    
+    // Vẽ nền nút
+    SDL_Rect bg = {x, y, w, h};
+    SDL_RenderFillRect(m_pRenderer, &bg);
+    SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_NONE);
+
+    // Vẽ viền nút
+    SDL_Color borderColor = isSelected ? SDL_Color{0, 255, 255, 255} : SDL_Color{150, 150, 150, 255};
+    SDL_SetRenderDrawColor(m_pRenderer, borderColor.r, borderColor.g, borderColor.b, 255);
+    SDL_RenderDrawRect(m_pRenderer, &bg);
+
+    // Vẽ Text nút (Căn lề trái có margin)
+    SDL_Color textColor = isSelected ? SDL_Color{255, 255, 255, 255} : SDL_Color{180, 180, 180, 255};
+    TextureManager::GetInstance()->DrawText("gui_font", text, x + 40, y + 10, textColor, m_pRenderer);
+}
+
+void GameEngine::LoadLevel(int levelIndex) {
+    // 1. Kiểm tra hợp lệ
+    if (levelIndex < 0 || levelIndex >= m_levelFiles.size()) {
+        std::cout << "[System] Da het Level! Quay ve Menu." << std::endl;
+        SwitchState(STATE_MENU);
+        return;
+    }
+
+    m_currentLevelIdx = levelIndex;
+
+    // 2. Dọn dẹp Map cũ
+    if (m_pMap) {
+        delete m_pMap;
+        m_pMap = nullptr;
+    }
+
+    // 3. Load Map mới
+    m_pMap = new Map();
+    m_pMap->LoadMap(m_levelFiles[m_currentLevelIdx]);
+
+    // 4. Auto-Fit Map vào màn hình (AAA Feature)
+    int mapRealW = m_pMap->GetMapPixelWidth();
+    int mapRealH = m_pMap->GetMapPixelHeight();
+    SDL_RenderSetLogicalSize(m_pRenderer, mapRealW, mapRealH);
+
+    // 5. Tính toán Thiên Cơ (AI) cho Map mới
+    // Reset dữ liệu cũ
+    m_visitedShrinesList.clear();
+    m_currentSteps = 0;
+    m_shrinesCollected = 0;
+    m_totalShrines = m_pMap->GetShrines().size();
+    
+    // Xóa lịch sử Undo cũ
+    while (!m_historyStack.empty()) m_historyStack.pop();
+
+    // Tính toán lại đường đi tối ưu
+    std::vector<std::vector<int>> insight = ThienCoEngine::GetInstance()->CalculateInsight(m_pMap);
+    DestinyResult destiny = ThienCoEngine::GetInstance()->CalculateDestiny(insight);
+    m_optimalSteps = destiny.totalSteps;
+
+    // 6. Reset Player về vị trí xuất phát mới
+    if (m_pPlayer) {
+        MapPoint start = m_pMap->GetStartPoint();
+        int tileSize = m_pMap->GetTileSize();
+        m_pPlayer->SetPosition(start.col * tileSize, start.row * tileSize);
+        // Reset animation về IDLE
+        // (Lưu ý: Nếu Player chưa có hàm ResetState, nó sẽ tự update trong vòng lặp sau)
+    }
+
+    std::cout << "[System] Loaded Level " << (m_currentLevelIdx + 1) << ": " << m_levelFiles[m_currentLevelIdx] << std::endl;
+}
+
+void GameEngine::NextLevel() {
+    // Tăng index và load
+    m_currentLevelIdx++;
+    
+    if (m_currentLevelIdx >= m_levelFiles.size()) {
+        // Đã phá đảo toàn bộ game!
+        std::cout << ">>> CHUC MUNG! BAN DA PHA DAO TOAN BO GAME! <<<" << std::endl;
+        // Có thể chuyển đến một màn hình Credit đặc biệt ở đây
+        // Tạm thời quay về Menu
+        m_currentLevelIdx = 0;
+        SwitchState(STATE_MENU);
+    } else {
+        LoadLevel(m_currentLevelIdx);
+        SwitchState(STATE_PLAY); // Vào chơi ngay
+    }
 }

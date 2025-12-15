@@ -28,15 +28,21 @@ Player::Player(const LoaderParams* pParams) : GameObject(pParams) {
     m_currentFrame = 0;
     
     // Animation Speed: Chạy thì nhanh (100ms), Đứng thì chậm (200ms)
-    m_animSpeed = 150;
+    m_animSpeed = 70;
     
     // Khởi tạo thời gian
     m_lastMoveTime = 0;
 
     // --- CẤU HÌNH TỶ LỆ AAA ---
-    // Hãy thử các số: 1.5f (to rưỡi), 2.0f (to gấp đôi), 2.5f...
-    // Tùy thuộc vào bạn muốn nhân vật chiếm bao nhiêu phần của ô đất.
-    m_scale = 10.0f;
+    // Ta muốn nhân vật chiếm khoảng 100% ô gạch để đẹp.
+    Map* pMap = GameEngine::GetInstance()->GetMap();
+    int tileSize = pMap->GetTileSize();
+    if (m_width > 0) {
+        // Tính toán scale động dựa trên kích thước thật
+        m_scale = ((float)tileSize / m_width) * 1.2f; 
+    } else {
+        m_scale = 1.0f; // Fallback
+    }
 }
 
 void Player::SetPosition(int x, int y) {
