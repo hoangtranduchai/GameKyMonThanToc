@@ -1,3 +1,0 @@
-E:/BachKhoaDaNang/PBL2/GameKyMonThanToc/build/CMakeFiles/KyMonThanToc.dir
-E:/BachKhoaDaNang/PBL2/GameKyMonThanToc/build/CMakeFiles/edit_cache.dir
-E:/BachKhoaDaNang/PBL2/GameKyMonThanToc/build/CMakeFiles/rebuild_cache.dir

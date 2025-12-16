@@ -1,0 +1,107 @@
+# ==============================================================================
+# PROJECT: KY MON THAN TOC (THE MYSTIC LABYRINTH)
+# MODULE:  Git Ignore Configuration
+# TYPE:    Version Control System Settings
+# AUTHOR:  Kien Truc Su Truong & Gemini AI
+# DESC:    Cấu hình loại bỏ các file không cần thiết khỏi Git Repository.
+#          Giữ cho Source Code sạch sẽ, nhẹ nhàng và chuyên nghiệp.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. THƯ MỤC BUILD & BINARY (SẢN PHẨM BIÊN DỊCH)
+# ------------------------------------------------------------------------------
+# Loại bỏ thư mục chứa kết quả biên dịch tạm thời.
+# Lý do: Có thể tái tạo lại từ Source Code, không nên đưa lên Git làm nặng repo.
+build/
+bin/
+out/
+x64/
+x86/
+Debug/
+Release/
+
+# ------------------------------------------------------------------------------
+# 2. CÁC TỆP THỰC THI & LIÊN KẾT (EXECUTABLES & LINKER FILES)
+# ------------------------------------------------------------------------------
+# Các file chạy và thư viện động/tĩnh sinh ra sau khi build.
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.pdb
+*.ilk
+*.exp
+*.obj
+*.o
+
+# Ngoại lệ (Exceptions): Giữ lại các file DLL của thư viện bên thứ 3 nếu nằm trong assets
+# (Nếu bạn để SDL2.dll trong thư mục gốc để chạy, ta có thể bỏ comment dòng dưới nếu cần track nó)
+# !libs/**/*.dll
+
+# ------------------------------------------------------------------------------
+# 3. HỆ THỐNG BUILD CMAKE (CMAKE ARTIFACTS)
+# ------------------------------------------------------------------------------
+# Các file cache và cấu hình tạm do CMake sinh ra.
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+Makefile
+*.ninja
+.ninja_deps
+.ninja_log
+*.cmake
+# Giữ lại file cấu hình chính của CMake
+!CMakeLists.txt
+
+# ------------------------------------------------------------------------------
+# 4. CẤU HÌNH IDE & EDITOR (IDE SETTINGS)
+# ------------------------------------------------------------------------------
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Visual Studio (Windows)
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.user
+*.vcxproj.filters
+*.suo
+*.opendb
+*.db
+
+# Các IDE khác (CLion, Eclipse...)
+.idea/
+.settings/
+.project
+.classpath
+
+# ------------------------------------------------------------------------------
+# 5. TỆP TẠM HỆ THỐNG & LOG (SYSTEM TEMP & LOGS)
+# ------------------------------------------------------------------------------
+# File rác của hệ điều hành Windows/Mac
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# File log debug
+*.log
+*.tlog
+game_output.log
+
+# ------------------------------------------------------------------------------
+# 6. TÀI NGUYÊN (ASSETS) - CẤU HÌNH CỤ THỂ
+# ------------------------------------------------------------------------------
+# Thông thường assets nên được track, nhưng tránh track các file thiết kế gốc quá nặng (.psd, .blend)
+# Chỉ track các file đã export (.png, .jpg, .wav)
+*.psd
+*.ai
+*.blend
+*.bak
+*.tmp
+
+# Đảm bảo thư mục assets luôn được theo dõi (nhưng bỏ qua file rác bên trong)
+!assets/
