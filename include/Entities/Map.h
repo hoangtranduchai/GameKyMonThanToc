@@ -1,85 +1,70 @@
 #pragma once
-#include <SDL.h>
+
+// THƯ VIỆN HỆ THỐNG
 #include <string>
 #include <vector>
+#include <iostream>
+#include <fstream>
 
-// Cấu trúc điểm đơn giản (Tọa độ lưới)
+// THƯ VIỆN DỰ ÁN
+#include <SDL.h>           // Cần cho SDL_Rect
+#include "Core/Config.h"   // Để lấy kích thước TILE_SIZE
+
+// STRUCT: MapPoint (TỌA ĐỘ LƯỚI)
 struct MapPoint {
-    int row;
-    int col;
+    int row; // Chỉ số hàng
+    int col; // Chỉ số cột
+
+    // Hàm khởi tạo (Constructor)
+    MapPoint(int r = 0, int c = 0) : row(r), col(c) {}
+
+    // // Toán tử so sánh
+    // bool operator==(const MapPoint& other) const {
+    //     return row == other.row && col == other.col;
+    // }
 };
 
+// CLASS: Map (HỆ THỐNG BẢN ĐỒ)
 class Map {
 public:
     Map();
     ~Map();
 
-    // Tải bản đồ
-    void LoadMap(std::string path);
+    // Tải bản đồ từ file .txt
+    void LoadMap(const std::string& path);
     
-    // Vẽ bản đồ ra màn hình
+    // Vẽ bản đồ lên màn hình
     void DrawMap();
 
-    // Hàm quan trọng để các lớp khác (Player, AI) biết ô nào đi được
-    // Trả về: 0 (Đất - Đi được), 1 (Núi - Chặn), 2 (Trận Nhãn - Đi được)
-    int GetTileID(int row, int col);
+    // CÁC HÀM TRUY VẤN & THIẾT LẬP (GETTERS & SETTERS)
 
-    // Cho phép thay đổi loại Tile tại vị trí cụ thể (dùng khi ăn Trận Nhãn hoặc Undo)
-    void SetTileID(int row, int col, int id) {
-        if (row >= 0 && row < m_rows && col >= 0 && col < m_cols) {
-            m_mapLayer[row][col] = id;
-        }
-    }
+    // Lấy ID của ô tại vị trí cụ thể (0: Đường đi, 1: Không khí, 2: Trận Nhãn)
+    int GetTileID(int row, int col) const;
 
-    // Getter kích thước bản đồ
-    int GetRows() const {
-        return m_rows;
-    }
-    int GetCols() const {
-        return m_cols;
-    }
-    
-    // Lấy vị trí bắt đầu (1,1) theo đề bài (nhưng trong mảng là 0,0)
-    // Thực tế đề bài bảo (1,1) là đất trống, ta cần map nó vào tọa độ pixel
-    int GetTileSize() const {
-        return m_tileSize;
-    }
+    // Cập nhật ID của ô (dùng khi thu thập trận nhãn hoặc hoàn tác)
+    void SetTileID(int row, int col, int id);
 
-    // Hàm lấy chiều rộng thực tế của map (Pixel)
-    int GetMapPixelWidth() const {
-        return m_cols * m_tileSize;
-    }
+    // Lấy điểm xuất phát của nhân vật
+    MapPoint GetStartPoint() const { return m_startPoint; }
 
-    // Hàm lấy chiều cao thực tế của map (Pixel)
-    int GetMapPixelHeight() const {
-        return m_rows * m_tileSize;
-    }
+    // Lấy danh sách tất cả các trận nhãn (Shrines)
+    const std::vector<MapPoint>& GetShrines() const { return m_shrines; }
 
-    // Lấy tọa độ điểm xuất phát (0, 0)
-    MapPoint GetStartPoint() const {
-        return m_startPoint;
-    }
-
-    // Lấy danh sách các Trận Nhãn để AI tính toán
-    const std::vector<MapPoint>& GetShrines() const {
-        return m_shrines;
-    }
-
-    // Kiểm tra xem ô (row, col) có phải là Trận Nhãn không (Dùng cho logic Khai mở)
-    bool IsShrine(int row, int col);
+    // Lấy kích thước bản đồ
+    int GetRows() const { return m_rows; }
+    int GetCols() const { return m_cols; }
 
 private:
-    // ID của texture tileset
-    std::string m_textureID;
+    // Ma trận lưu trữ bản đồ (Vector 2 chiều)
+    std::vector<std::vector<int>> m_mapMatrix;
 
+    // Vị trí xuất phát của nhân vật
+    MapPoint m_startPoint;
+
+    // Danh sách tọa độ các trận nhãn (TileID = 2)
+    std::vector<MapPoint> m_shrines;
+
+    // Kích thước bản đồ hiện tại
     int m_rows;
     int m_cols;
-    int m_numShrines; // Số lượng Trận Nhãn (N)
-    int m_tileSize;
-
-    // Dùng vector động để chứa bản đồ kích thước bất kỳ (R x C)
-    std::vector<std::vector<int>> m_mapLayer;
-
-    MapPoint m_startPoint;        // Vị trí bắt đầu
-    std::vector<MapPoint> m_shrines; // Danh sách tọa độ các Trận Nhãn
 };

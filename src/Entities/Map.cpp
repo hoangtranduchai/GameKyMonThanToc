@@ -1,105 +1,109 @@
-#include "Map.h"
-#include "TextureManager.h"
-#include "GameEngine.h"
+#include "Entities/Map.h"
+#include "Graphics/TextureManager.h"
+#include "Core/GameEngine.h" // Để truy cập bộ kết xuất đồ họa (Renderer)
 #include <fstream>
 #include <iostream>
 
-Map::Map() {
-    m_textureID = "tiles"; // ID của texture chúng ta sẽ load
-    m_rows = 0;
-    m_cols = 0;
-    m_numShrines = 0;
-    m_tileSize = 640;
+// HÀM KHỞI TẠO & HỦY (CONSTRUCTOR & DESTRUCTOR)
+
+Map::Map() : m_rows(0), m_cols(0) {
+    m_startPoint = {1, 1}; // Điểm xuất phát mặc định
 }
 
-Map::~Map() {
-}
+Map::~Map() {}
 
-void Map::LoadMap(std::string path) {
-    std::ifstream inputFile(path);
+// XỬ LÝ DỮ LIỆU (DATA PROCESSING)
 
-    if (!inputFile.is_open()) {
-        std::cout << "[Lỗi] Khong the mo file ban do: " << path << std::endl;
+void Map::LoadMap(const std::string& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        std::cerr << "[LỖI] Không thể mở file bản đồ: " << path << std::endl;
         return;
     }
 
-    // Đọc Header (R, C, N)
-    if (!(inputFile >> m_rows >> m_cols >> m_numShrines)) {
-        std::cout << "[Lỗi] File map khong dung dinh dang header!" << std::endl;
+    // 1. Đọc kích thước bản đồ
+    file >> m_rows >> m_cols;
+
+    if (m_rows <= 0 || m_cols <= 0) {
+        std::cerr << "[LỖI NGHIÊM TRỌNG] Kích thước bản đồ không hợp lệ!" << std::endl;
         return;
     }
 
-    // Resize vector động theo kích thước R x C (preallocate rows)
-    m_mapLayer.clear();
-    m_mapLayer.reserve(m_rows);
-    for (int i = 0; i < m_rows; ++i) {
-        m_mapLayer.emplace_back(std::vector<int>(m_cols));
-    }
-
-    // Xóa dữ liệu cũ nếu có và preallocate shrines list
-    m_shrines.clear();
-    if (m_numShrines > 0) m_shrines.reserve(m_numShrines);
-
-    // Đọc lưới ký tự
-    char tileChar;
+    // Thay đổi kích thước ma trận
+    m_mapMatrix.resize(m_rows);
     for (int i = 0; i < m_rows; i++) {
-        for (int j = 0; j < m_cols; j++) {
-            inputFile >> tileChar;
+        m_mapMatrix[i].resize(m_cols);
+    }
+
+    // Xóa bộ nhớ đệm cũ
+    m_shrines.clear();
+
+    // 2. Đọc dữ liệu từng ô lưới (Grid Data)
+    for (int row = 0; row < m_rows; row++) {
+        for (int col = 0; col < m_cols; col++) {
+            int tileCode = 0;
+            file >> tileCode; // Đọc mã số từ file
             
-            // LOGIC PHÂN LOẠI TILE
-            if (tileChar == '#') {
-                m_mapLayer[i][j] = 1; // 1 = Núi (Vật cản)
-            } 
-            else if (tileChar == 'S') {
-                m_mapLayer[i][j] = 2; // 2 = Trận Nhãn (Shrine)
-                
-                // --- QUAN TRỌNG: LƯU TỌA ĐỘ TRẬN NHÃN ---
-                m_shrines.push_back({i, j}); 
-            } 
-            else {
-                // '.' là đất trống
-                m_mapLayer[i][j] = 0; // 0 = Đất
+            // Xử lý logic đặc biệt
+            if (tileCode == Config::TileID::SHRINE) { // Mã 2: Trận nhãn
+                m_shrines.push_back(MapPoint(row, col));
+            }
+
+            // Lưu vào ma trận
+            m_mapMatrix[row][col] = tileCode;
+        }
+    }
+
+    file.close();
+    std::cout << "[HỆ THỐNG] Đã tải bản đồ: " << path << " [" << m_rows << "x" << m_cols << "]" << std::endl;
+    std::cout << "[THÔNG TIN] Số trận nhãn phát hiện: " << m_shrines.size() << std::endl;
+}
+
+// KẾT XUẤT ĐỒ HỌA (RENDERING)
+
+void Map::DrawMap() {
+    int tileID = 0;
+
+    // Lấy bộ kết xuất một lần để dùng cho vòng lặp
+    SDL_Renderer* pRenderer = GameEngine::GetInstance()->GetRenderer();
+
+    for (int row = 0; row < m_rows; row++) {
+        for (int col = 0; col < m_cols; col++) {
+            tileID = m_mapMatrix[row][col];
+
+            // Tọa độ vẽ trên màn hình
+            int x = col * Config::TILE_SIZE;
+            int y = row * Config::TILE_SIZE;
+
+            // VẼ BẰNG PHƯƠNG THỨC DRAW FRAME (CẮT TỪ TILESET)
+            
+            if (tileID >= 0) {
+                TextureManager::GetInstance()->DrawFrame(
+                    "tileset",          // ID của Texture
+                    x, y,               // Vị trí vẽ trên màn hình
+                    Config::TILE_SIZE,  // Chiều rộng một ô
+                    Config::TILE_SIZE,  // Chiều cao một ô
+                    0,                  // Hàng số 0 trong tileset
+                    tileID,             // Cột (Frame) tương ứng với ID
+                    pRenderer           // Bộ kết xuất đồ họa
+                );
             }
         }
     }
-
-    m_startPoint = {0, 0};
-
-    inputFile.close();
-    std::cout << "[He thong] Map Loaded (" << m_rows << "x" << m_cols << "). Tim thay " << m_shrines.size() << " Tran Nhan." << std::endl;
 }
 
-// Kiểm tra xem một ô có phải là Trận Nhãn không
-bool Map::IsShrine(int row, int col) {
-    // Cách nhanh nhất: kiểm tra ID trong mảng map
-    // (Vì lúc load ta đã gán ID 2 cho Shrine)
+// TRUY XUẤT THÔNG TIN (DATA ACCESS)
+
+int Map::GetTileID(int row, int col) const {
+    // Kiểm tra biên (Bounds Check) để tránh lỗi tràn mảng và crash game
     if (row >= 0 && row < m_rows && col >= 0 && col < m_cols) {
-        return m_mapLayer[row][col] == 2;
+        return m_mapMatrix[row][col];
     }
-    return false;
+    return Config::TileID::AIR; // Nếu truy vấn ngoài phạm vi bản đồ, coi như là ô không khí
 }
 
-int Map::GetTileID(int row, int col) {
-    // Kiểm tra biên an toàn
+void Map::SetTileID(int row, int col, int id) {
     if (row >= 0 && row < m_rows && col >= 0 && col < m_cols) {
-        return m_mapLayer[row][col];
-    }
-    return 1; // Mặc định trả về 1 (Núi/Không đi được) nếu ra ngoài biên
-}
-
-void Map::DrawMap() {
-    // Cache renderer and texture manager to reduce repeated GetInstance calls
-    auto* texMgr = TextureManager::GetInstance();
-    auto* renderer = GameEngine::GetInstance()->GetRenderer();
-    
-    for (int row = 0; row < m_rows; row++) {
-        int y = row * m_tileSize;
-        for (int col = 0; col < m_cols; col++) {
-            int type = m_mapLayer[row][col];
-            // Vẽ đúng tại tọa độ gốc của tile
-            int x = col * m_tileSize;
-
-            texMgr->DrawTile(m_textureID, 0, 0, x, y, m_tileSize, m_tileSize, 1, type, renderer);
-        }
+        m_mapMatrix[row][col] = id;
     }
 }

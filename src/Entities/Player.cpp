@@ -1,250 +1,241 @@
-#include "Player.h"
-#include "GameEngine.h"
-#include "Map.h"
-#include <cmath>
+#include "Entities/Player.h"
+#include "Core/GameEngine.h"
+#include "Graphics/TextureManager.h"
+#include "Audio/SoundManager.h"
+#include "Entities/Map.h"
+#include <cmath> // Dùng cho các phép toán vị trí
 
-Player::Player(const LoaderParams* pParams) : GameObject(pParams) {
-    // Giải nén tham số từ LoaderParams vào biến thành viên
-    m_x = pParams->m_x;
-    m_y = pParams->m_y;
+// HÀM KHỜI TẠO & HỦY (CONSTRUCTOR & DESTRUCTOR)
 
-    m_width = pParams->m_width;
-    m_height = pParams->m_height;
-
-    // Khởi tạo vị trí hiển thị (Visual) trùng với vị trí Logic ban đầu
-    m_visualX = (float)m_x;
-    m_visualY = (float)m_y;
-
-    // Khởi tạo trạng thái mặc định
-    m_currentState = STATE_IDLE;
-    m_lastState = STATE_IDLE;
-    m_currentDirection = DIR_DOWN;
-    m_lastDirection = DIR_DOWN;
-
-    m_textureID = "player_idle_down"; // ID mặc định
-    
-    // Tất cả đều có 8 frame
-    m_numFrames = 8;
-    m_currentFrame = 0;
-    
-    // Animation Speed (milliseconds per frame): Run=70ms (fast), Idle=200ms (slow)
-    m_animSpeed = 70;
-    
-    // Khởi tạo thời gian
-    m_lastMoveTime = 0;
-
-    // --- CẤU HÌNH TỶ LỆ AAA ---
-    // Ta muốn nhân vật chiếm khoảng 100% ô gạch để đẹp.
-    Map* pMap = GameEngine::GetInstance()->GetMap();
-    if (pMap == nullptr) {
-        m_scale = 1.0f;
-        return;
-    }
-    int tileSize = pMap->GetTileSize();
-    if (m_width > 0) {
-        // Tính toán scale động dựa trên kích thước thật
-        // Factor 1.2f để nhân vật chiếm ~120% tile size cho visual clarity
-        m_scale = ((float)tileSize / m_width) * 1.2f; 
-    } else {
-        std::cout << "[Warning] Player width is 0, using default scale" << std::endl;
-        m_scale = 1.0f; // Fallback
-    }
+Player::Player(const LoaderParams* pParams) 
+    : GameObject(pParams),
+      m_velX(0.0f),
+      m_velY(0.0f),
+      m_currentDir(PlayerDirection::DOWN),
+      m_lastDir(PlayerDirection::DOWN),
+      m_isMoving(false),
+      m_isFalling(false),
+      m_fallTimer(0.0f),
+      m_fallStartY(0.0f)
+{
 }
 
-void Player::SetPosition(int x, int y) {
-    m_x = x;
-    m_y = y;
-    
-    // Khi teleport (Undo/Reset), visual cũng phải nhảy theo ngay lập tức
-    m_visualX = (float)x;
-    m_visualY = (float)y;
-    
-    // Reset thời gian để có thể đi tiếp ngay
-    m_lastMoveTime = SDL_GetTicks() - MOVE_DELAY;
-}
-
-// Hàm cập nhật ID Texture dựa trên Trạng thái & Hướng
-void Player::UpdateAnimationID() {
-    // Nếu trạng thái hoặc hướng không đổi, không cần làm gì cả (Tối ưu AAA)
-    if (m_currentState == m_lastState && m_currentDirection == m_lastDirection) {
-        return;
-    }
-
-    std::string actionStr = "";
-    std::string dirStr = "";
-    
-    // 1. Cấu hình Animation cho từng trạng thái
-    switch (m_currentState) {
-        case STATE_IDLE:
-            actionStr = "idle";
-            m_animSpeed = 200; // Đứng thở chậm rãi (200ms/frame)
-            break;
-        case STATE_RUN:
-            actionStr = "run";
-            m_animSpeed = 80;  // Chạy nhanh (80ms/frame) -> Mượt hơn
-            break;
-    }
-
-    // 2. Xác định chuỗi Hướng
-    switch (m_currentDirection) {
-        case DIR_DOWN: dirStr = "down"; break;
-        case DIR_LEFT: dirStr = "left"; break;
-        case DIR_RIGHT: dirStr = "right"; break;
-        case DIR_UP:   dirStr = "up"; break;
-    }
-
-    // 3. Tạo ID mới
-    m_textureID = "player_" + actionStr + "_" + dirStr;
-
-    // 4. Reset Frame về 0 để bắt đầu animation mới từ đầu
-    m_currentFrame = 0;
-    
-    // 5. Lưu lại trạng thái cũ
-    m_lastState = m_currentState;
-    m_lastDirection = m_currentDirection;
-}
-
-void Player::HandleInput() {
-    // 1. Kiểm tra Cooldown: Nếu chưa đủ thời gian nghỉ thì không làm gì cả
-    Uint32 currentTime = SDL_GetTicks();
-    
-    // Nếu nhân vật đã đến đích (Visual đuổi kịp Logic) và không bấm phím -> Về IDLE
-    // Cache deltas and avoid abs() for floating point comparisons
-    float dx = (float)m_x - m_visualX;
-    float dy = (float)m_y - m_visualY;
-    if ((dx < 2.0f && dx > -2.0f) && (dy < 2.0f && dy > -2.0f)) {
-        // Chỉ reset về IDLE nếu đang không bị cooldown di chuyển chặn
-        if (currentTime - m_lastMoveTime > MOVE_DELAY) {
-             m_currentState = STATE_IDLE;
-        }
-    }
-
-    if (currentTime - m_lastMoveTime < MOVE_DELAY) return;
-
-    const Uint8* state = SDL_GetKeyboardState(NULL);
-    
-    // Lấy thông tin Map để tính toán
-    Map* pMap = GameEngine::GetInstance()->GetMap();
-    if (pMap == nullptr) return; // Safety check
-    int tileSize = pMap->GetTileSize();
-
-    // Tính Grid
-    int currentRow = (m_y + m_height / 2) / tileSize;
-    int currentCol = (m_x + m_width / 2) / tileSize;
-
-    // Reset dx, dy logic grid
-    int nextRow = currentRow;
-    int nextCol = currentCol;
-    bool hasInput = false;
-
-    // 2. Xử lý Phím bấm -> Xác định Hướng
-    if (state[SDL_SCANCODE_W] || state[SDL_SCANCODE_UP]) {
-        nextRow--;
-        hasInput = true;
-        m_currentDirection = DIR_UP;
-    }
-    else if (state[SDL_SCANCODE_S] || state[SDL_SCANCODE_DOWN]) {
-        nextRow++;
-        hasInput = true;
-        m_currentDirection = DIR_DOWN;
-    }
-    else if (state[SDL_SCANCODE_A] || state[SDL_SCANCODE_LEFT]) {
-        nextCol--;
-        hasInput = true;
-        m_currentDirection = DIR_LEFT;
-    }
-    else if (state[SDL_SCANCODE_D] || state[SDL_SCANCODE_RIGHT]) {
-        nextCol++;
-        hasInput = true;
-        m_currentDirection = DIR_RIGHT;
-    }
-
-    // 3. Thực hiện Di chuyển Logic (Grid Jump)
-    if (hasInput) {
-        // Cập nhật trạng thái sang CHẠY
-        m_currentState = STATE_RUN;
-
-        // Kiểm tra va chạm (Map trả về 1 là Núi)
-        int nextTileID = pMap->GetTileID(nextRow, nextCol);
-        if (nextTileID != 1) { // Không phải Núi
-            // --- LƯU TRẠNG THÁI UNDO ---
-            GameEngine::GetInstance()->SaveState();
-
-            // Cập nhật tọa độ
-            m_x = nextCol * tileSize;
-            m_y = nextRow * tileSize;
-            m_lastMoveTime = currentTime;
-
-            // Báo cáo Engine
-            GameEngine::GetInstance()->OnPlayerMove();
-
-            // Kiểm tra Trận Nhãn
-            if (nextTileID == 2) {
-                GameEngine::GetInstance()->OnShrineVisited(nextRow, nextCol);
-            }
-        }
-    }
-
-    // Luôn cập nhật Animation ID ở cuối Input để đảm bảo ID đúng
-    UpdateAnimationID();
-}
+Player::~Player() { Clean(); }
 
 void Player::Update() {
-    HandleInput(); // Xử lý logic nhảy ô (thay đổi m_x, m_y)
+    // Lấy khoảng thời gian Delta Time từ Engine
+    float dt = GameEngine::GetInstance()->GetDeltaTime();
 
-    // 1. Smooth Movement (Lerp)
-    const float dt = GameEngine::GetInstance()->GetDeltaTime();
-    const float smooth_dt = SMOOTH_SPEED * dt;  // Cache multiplication
+    // TRƯỜNG HỢP 1: ĐANG RƠI XUỐNG VỰC (FALLING STATE)
+    if (m_isFalling) {
+        m_fallTimer += dt;
+
+        // 1. Hiệu ứng mờ dần
+        // Tính Alpha dựa trên % thời gian đã trôi qua
+        float progress = m_fallTimer / FALL_DURATION; // 0.0 -> 1.0
+        if (progress > 1.0f) progress = 1.0f;
+        
+        m_alpha = (int)(255 * (1.0f - progress)); // Giảm từ 255 về 0
+        if (m_alpha < 0) m_alpha = 0;
+
+        // 2. Hiệu ứng tụt xuống
+        // Rơi xuống khoảng 1 ô (64px) trong suốt quá trình
+        m_y = m_fallStartY + (progress * 50.0f); 
+
+        // 3. Kiểm tra kết thúc
+        if (m_fallTimer >= FALL_DURATION) {
+            // Chuyển sang màn hình thua
+            GameEngine::GetInstance()->SwitchState(STATE_RESULT_LOSE);
+        }
+        
+        // Khi đang rơi, không xử lý Input hay Animation nữa
+        return; 
+    }
+
+    // TRƯỜNG HỢP 2: TRẠNG THÁI BÌNH THƯỜNG (NORMAL STATE)
+    HandleInput();          // 1. Đọc bàn phím
+    HandleMovement(dt);     // 2. Di chuyển vật lý & Tương tác ô
+    UpdateAnimation();      // 3. Cập nhật hình ảnh (Idle/Run)
+}
+
+// XỬ LÝ ĐẦU VÀO (INPUT HANDLING)
+void Player::HandleInput() {
+    // Đặt lại vận tốc mỗi khung hình để nhân vật dừng lại ngay khi thả phím
+    m_velX = 0;
+    m_velY = 0;
+    m_isMoving = false;
+
+    // LÁY TRẠNG THÁI BÀN PHÍM HIỆN TẠI
+    const Uint8* currentKeyStates = SDL_GetKeyboardState(NULL);
+
+    // XỬ LÝ LOGIC DI CHUYỂN (MOVEMENT LOGIC)
+
+    if (currentKeyStates[SDL_SCANCODE_UP] || currentKeyStates[SDL_SCANCODE_W]) {
+        m_velY = -Config::PLAYER_SPEED;
+        m_currentDir = PlayerDirection::UP;
+        m_isMoving = true;
+    }
+    else if (currentKeyStates[SDL_SCANCODE_DOWN] || currentKeyStates[SDL_SCANCODE_S]) {
+        m_velY = Config::PLAYER_SPEED;
+        m_currentDir = PlayerDirection::DOWN;
+        m_isMoving = true;
+    }
+    else if (currentKeyStates[SDL_SCANCODE_LEFT] || currentKeyStates[SDL_SCANCODE_A]) {
+        m_velX = -Config::PLAYER_SPEED;
+        m_currentDir = PlayerDirection::LEFT;
+        m_isMoving = true;
+    }
+    else if (currentKeyStates[SDL_SCANCODE_RIGHT] || currentKeyStates[SDL_SCANCODE_D]) {
+        m_velX = Config::PLAYER_SPEED;
+        m_currentDir = PlayerDirection::RIGHT;
+        m_isMoving = true;
+    }
+
+    // Nếu đang di chuyển, cập nhật hướng nhìn cuối cùng
+    if (m_isMoving) {
+        m_lastDir = m_currentDir;
+    }
+}
+
+// XỬ LÝ DI CHUYỂN VẬT LÝ
+void Player::HandleMovement(float dt) {
+    // 1. Tính toán vị trí tiếp theo dựa trên vận tốc và Delta Time
+    m_x += m_velX * dt;
+    m_y += m_velY * dt;
+
+    // 2. Lấy kích thước Map hiện tại
+    int mapWidth = GameEngine::GetInstance()->GetMap()->GetCols() * Config::TILE_SIZE;
+    int mapHeight = GameEngine::GetInstance()->GetMap()->GetRows() * Config::TILE_SIZE;
+
+    // 3. KIỂM TRA BIÊN BẢN ĐỒ (MAP BOUNDARIES CHECK)
+    // Nếu bất kỳ phần nào của nhân vật đi ra khỏi giới hạn Map -> Rơi xuống vực
+    bool isOutLeft   = (m_x < 0);
+    bool isOutTop    = (m_y < 0);
+    bool isOutRight  = (m_x + m_width > mapWidth);
+    bool isOutBottom = (m_y + m_height > mapHeight);
+
+    if (isOutLeft || isOutTop || isOutRight || isOutBottom) {
+        // Kích hoạt hiệu ứng rơi ngay lập tức
+        Falling();
+        return;
+    }
+
+    // 4. Nếu vẫn ở trong map -> Xử lý tương tác với ô lưới (Tile Interaction)
+    ProcessTileInteraction();
+}
+
+void Player::ProcessTileInteraction() {
+    // Tính toán TÂM (Center) của nhân vật
+    // Dùng tâm giúp cảm giác điều khiển chính xác hơn (không bị va chạm khi chỉ mới chạm rìa)
+    int centerX = (int)(m_x + m_width / 2);
+    int centerY = (int)(m_y + m_height / 2);
+
+    // Quy đổi ra tọa độ lưới (Grid Coordinates)
+    int gridCol = centerX / Config::TILE_SIZE;
+    int gridRow = centerY / Config::TILE_SIZE;
+
+    // Lấy thông tin bản đồ
+    Map* pMap = GameEngine::GetInstance()->GetMap();
+    int tileID = pMap->GetTileID(gridRow, gridCol);
+
+    // XỬ LÝ LOGIC TƯƠNG TÁC VỚI Ô LƯỚI (TILE INTERACTION LOGIC)
     
-    // Nội suy Visual về phía Logic
-    // Dùng Epsilon 1.0f để snap vị trí khi đã rất gần, tránh rung
-    float dx = m_x - m_visualX;
-    if (dx < 1.0f && dx > -1.0f) m_visualX = (float)m_x;
-    else m_visualX += dx * smooth_dt;
+    // TRƯỜNG HỢP 1: TRẬN NHÃN (SHRINE - ID 2)
+    if (tileID == Config::TileID::SHRINE) {
+        // Gọi Engine xử lý: Cộng điểm, Phát âm thanh
+        GameEngine::GetInstance()->OnShrineVisited(gridRow, gridCol);
+    }
+    // TRƯỜNG HỢP 2: KHÔNG KHÍ (AIR) Đi vào ô này sẽ RƠI
+    else if (tileID == Config::TileID::AIR) {
+        // Kích hoạt trạng thái rơi ngay lập tức
+        Falling();
+    }
+}
 
-    float dy = m_y - m_visualY;
-    if (dy < 1.0f && dy > -1.0f) m_visualY = (float)m_y;
-    else m_visualY += dy * smooth_dt;
+void Player::Falling() {
+    if (m_isFalling) return; // Đã rơi rồi thì thôi
 
-    // 2. Animation Frame Update (Độc lập với logic di chuyển)
-    // Sử dụng SDL_GetTicks để tính frame dựa trên thời gian thực
-    // Chia cho m_animSpeed để điều chỉnh tốc độ nhanh/chậm
+    m_isFalling = true;
+    m_fallTimer = 0.0f;
+    m_fallStartY = m_y; // Ghi nhớ độ cao để làm hiệu ứng tụt xuống
+    
+    // Phát âm thanh thất bại
+    SoundManager::GetInstance()->PlaySFX("sfx_lose");
+}
+
+// HỆ THỐNG ANIMATION (VISUALS)
+void Player::UpdateAnimation() {
+    // 1. Xác định hành động (Action Prefix)
+    std::string action = m_isMoving ? "run_" : "idle_";
+
+    // 2. Xác định hướng (Direction Suffix)
+    std::string direction = "down"; // Mặc định
+    
+    // Nếu đang chạy, dùng hướng hiện tại. Nếu đứng yên, dùng hướng cuối cùng (LastDir).
+    PlayerDirection dirToUse = m_isMoving ? m_currentDir : m_lastDir;
+
+    switch (dirToUse) {
+        case PlayerDirection::UP:    direction = "up"; break;
+        case PlayerDirection::DOWN:  direction = "down"; break;
+        case PlayerDirection::LEFT:  direction = "left"; break;
+        case PlayerDirection::RIGHT: direction = "right"; break;
+        default: break;
+    }
+
+    // 3. Ghép chuỗi để tạo Texture ID
+    // Ví dụ: "run_" + "left" = "run_left"
+    std::string newTextureID = action + direction;
+
+    // Cập nhật vào GameObject
+    SetTexture(newTextureID);
+
+    // 4. Tính toán Frame Animation
+    // Công thức: (Thời gian hệ thống / Tốc độ) % Tổng số frame
+    // Giúp animation chạy đều bất kể FPS.
     m_currentFrame = int(((SDL_GetTicks() / m_animSpeed) % m_numFrames));
 }
 
+// VẼ HÌNH (RENDERING)
 void Player::Draw() {
-    // --- LOGIC CĂN GIỮA (CENTERING) ---
-    // Để nhân vật đứng giữa ô, ta cần dịch chuyển lùi lại một chút
-    // Công thức: Offset = (Kích thước Tile - Kích thước Nhân vật sau khi Scale) / 2
-    
-    Map* pMap = GameEngine::GetInstance()->GetMap();
-    if (pMap == nullptr) return; // Safety check
-    int tileSize = pMap->GetTileSize();
-    
-    // Kích thước hiển thị thực tế của Player
-    int drawW = (int)(m_width * m_scale);
-    int drawH = (int)(m_height * m_scale);
-    
-    // Tính toán tọa độ vẽ để căn giữa Tile
-    // m_visualX là góc trên-trái của ô Tile logic
-    int drawX = (int)(m_visualX + (tileSize - drawW) / 2);
-    
-    // Căn đáy: Để chân nhân vật chạm đáy ô (thường đẹp hơn căn giữa theo chiều dọc)
-    // Hoặc căn giữa hoàn toàn: (tileSize - drawH) / 2
-    int drawY = (int)(m_visualY + (tileSize - drawH) / 2); 
+    // Lấy Renderer
+    SDL_Renderer* pRenderer = GameEngine::GetInstance()->GetRenderer();
 
+    // [HIỆU ỨNG RƠI] Cập nhật độ trong suốt (Alpha Mod)
+    // Nếu m_alpha < 255, nhân vật sẽ mờ đi.
+    // Lấy texture hiện tại từ Manager để set Alpha
+    SDL_Texture* tex = TextureManager::GetInstance()->GetTexture(m_textureID); 
+    if (tex) SDL_SetTextureAlphaMod(tex, (Uint8)m_alpha);
+
+    // Gọi hàm vẽ Frame chuẩn (Cắt từ dải 8 frame)
     TextureManager::GetInstance()->DrawFrame(
         m_textureID, 
-        drawX,    // Vẽ tại vị trí đã căn chỉnh
-        drawY, 
-        m_width,  // Kích thước gốc (để cắt ảnh)
-        m_height, 
-        1, 
+        (int)m_x, (int)m_y, 
+        m_width, m_height, 
+        m_currentRow, 
         m_currentFrame, 
-        GameEngine::GetInstance()->GetRenderer(), 
-        m_scale,  // <--- TRUYỀN TỶ LỆ PHÓNG TO
-        SDL_FLIP_NONE
+        pRenderer
     );
+
+    // Khôi phục độ trong suốt về 255 sau khi vẽ
+    if (tex) SDL_SetTextureAlphaMod(tex, 255);
+}
+
+// Thiết lập lại vị trí nhân vật
+void Player::SetPosition(float x, float y) {
+    m_x = x;
+    m_y = y;
+    
+    // Khôi phục toàn bộ trạng thái khi được dịch chuyển (Teleport)
+    m_isFalling = false;
+    m_alpha = 255;
+    m_fallTimer = 0.0f;
+    m_velX = 0;
+    m_velY = 0;
+    
+    // Khôi phục animation về trạng thái đứng yên hướng xuống
+    m_currentDir = PlayerDirection::DOWN;
+    m_lastDir = PlayerDirection::DOWN;
+    m_isMoving = false;
 }
 
 void Player::Clean() {}

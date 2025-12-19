@@ -1,133 +1,176 @@
-#include "ThienCoEngine.h"
-#include <iostream>
-#include <iomanip>
-#include <algorithm>
+#include "Algorithms/ThienCoEngine.h"
 
-// Hàm BFS cơ bản (Breath-First Search) - Trái tim của bài toán tìm đường
-std::vector<std::vector<int>> ThienCoEngine::BFS(Map* pMap, MapPoint start) {
+// Khởi tạo con trỏ Singleton
+ThienCoEngine* ThienCoEngine::s_Instance = nullptr;
+
+// TRIỂN KHAI MẪU THIẾT KẾ SINGLETON (SINGLETON PATTERN IMPLEMENTATION)
+
+ThienCoEngine* ThienCoEngine::GetInstance() {
+    if (s_Instance == nullptr) s_Instance = new ThienCoEngine();
+    return s_Instance;
+}
+
+void ThienCoEngine::DestroyInstance() {
+    if (s_Instance != nullptr) {
+        delete s_Instance;
+        s_Instance = nullptr;
+    }
+}
+
+// Hàm khởi tạo riêng tư (Private Constructor)
+ThienCoEngine::ThienCoEngine() {}
+
+ThienCoEngine::~ThienCoEngine() {}
+
+// TÍNH TOÁN MA TRẬN KHOẢNG CÁCH GIỮA CÁC ĐIỂM QUAN TRỌNG (Vị trí xuất phát + Các trận nhãn)
+Matrix ThienCoEngine::CalculateMatrix(Map* pMap) {
+    Matrix matrix;
+    
+    // 1. Danh sách các điểm quan trọng (Nodes)
+    // Node 0: Vị trí xuất phát của nhân vật (Start Point)
+    // Node 1..N: Các trận nhãn (Shrines)
+    std::vector<MapPoint> keyPoints;
+    keyPoints.push_back(pMap->GetStartPoint()); // Thêm điểm xuất phát vào đầu tiên
+    
+    const std::vector<MapPoint>& shrines = pMap->GetShrines();
+    keyPoints.insert(keyPoints.end(), shrines.begin(), shrines.end());
+    
+    int N = (int)keyPoints.size();
+    matrix.nodeCount = N;
+    
+    // 2. Khởi tạo kích thước ma trận khoảng cách (NxN)
+    // Giá trị ban đầu là 0
+    matrix.distances.assign(N, std::vector<int>(N, 0));
+    
+    // 3. Chạy BFS giữa mọi cặp điểm để tính khoảng cách ngắn nhất
+    // Vì đồ thị vô hướng (đi từ A->B bằng B->A), chỉ cần tính một nửa ma trận
+    for (int i = 0; i < N; i++) {
+        for (int j = i + 1; j < N; j++) {
+            // Tính khoảng cách từ Node i đến Node j
+            int dist = BFS_FindShortestPath(keyPoints[i], keyPoints[j], pMap);
+            
+            // Lưu vào ma trận đối xứng (vì đồ thị vô hướng)
+            matrix.distances[i][j] = dist;
+            matrix.distances[j][i] = dist;
+        }
+    }
+    return matrix;
+}
+
+// THUẬT TOÁN BFS (TÌM ĐƯỜNG NGẮN NHẤT TRÊN LƯỚI)
+int ThienCoEngine::BFS_FindShortestPath(MapPoint start, MapPoint end, Map* pMap) {
+    if (start.row == end.row && start.col == end.col) return 0;
+
     int rows = pMap->GetRows();
     int cols = pMap->GetCols();
 
-    // Khởi tạo bảng khoảng cách với giá trị -1 (chưa đến được)
-    std::vector<std::vector<int>> dist(rows, std::vector<int>(cols, -1));
-    
-    // Hàng đợi cho BFS
-    std::queue<Node> q;
+    // Thay đổi kích thước hoặc đặt lại ma trận khoảng cách
+    if (dist.size() != rows || (rows > 0 && dist[0].size() != cols)) {
+        dist.assign(rows, std::vector<int>(cols, -1));
+    } else {
+        for (int i = 0; i < rows; i++) {
+            std::fill(dist[i].begin(), dist[i].end(), -1);
+        }
+    }
 
-    // Bắt đầu từ điểm start
-    q.push({start.row, start.col, 0});
+    std::queue<MapPoint> q;
+    q.push(start);
     dist[start.row][start.col] = 0;
 
-    // 4 hướng di chuyển: Lên, Xuống, Trái, Phải
+    // 4 hướng: Lên, Xuống, Trái, Phải
     int dRow[] = {-1, 1, 0, 0};
     int dCol[] = {0, 0, -1, 1};
 
     while (!q.empty()) {
-        Node current = q.front();
+        MapPoint current = q.front();
         q.pop();
 
-        // Duyệt 4 hướng
+        if (current.row == end.row && current.col == end.col) {
+            return dist[current.row][current.col];
+        }
+
         for (int i = 0; i < 4; i++) {
             int newRow = current.row + dRow[i];
             int newCol = current.col + dCol[i];
 
-            // Kiểm tra biên và vật cản
-            // GetTileID trả về 1 là NÚI (#) -> Không đi được
-            if (pMap->GetTileID(newRow, newCol) != 1) {
-                // Nếu chưa thăm (dist == -1)
-                if (dist[newRow][newCol] == -1) {
-                    dist[newRow][newCol] = current.distance + 1;
-                    q.push({newRow, newCol, current.distance + 1});
+            // Kiểm tra biên và tính hợp lệ
+            if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
+                if (dist[newRow][newCol] == -1 && pMap->GetTileID(newRow, newCol) != 1) {
+                    dist[newRow][newCol] = dist[current.row][current.col] + 1;
+                    q.push({newRow, newCol});
                 }
             }
         }
     }
 
-    return dist;
+    return INF;
 }
 
-std::vector<std::vector<int>> ThienCoEngine::CalculateInsight(Map* pMap) {
-    std::cout << "\n--- [THIEN CO ENGINE] KHOI DONG HE THONG MINH TRI ---" << std::endl;
 
-    // 1. Thu thập danh sách các điểm quan trọng
-    std::vector<MapPoint> points;
-    
-    // Điểm 0: Xuất phát
-    points.push_back(pMap->GetStartPoint());
-    
-    // Điểm 1..N: Các Trận Nhãn
-    const std::vector<MapPoint>& shrines = pMap->GetShrines();
-    points.insert(points.end(), shrines.begin(), shrines.end());
+// TÍNH TOÁN KẾT QUẢ TỐI ƯU THEO THIÊN MỆNH (BÀI TOÁN TSP)
+Solution ThienCoEngine::CalculateSolution(const Matrix& matrix) {
+    Solution solution;
+    int N = matrix.nodeCount;
 
-    int N = points.size(); // Tổng số điểm (1 Start + K Shrine)
-    std::cout << "Phat hien " << N << " dia diem quan trong (1 Start + " << N-1 << " Shrine)." << std::endl;
-
-    // 2. Khởi tạo Ma trận kết quả (N x N)
-    std::vector<std::vector<int>> matrix(N, std::vector<int>(N, 0));
-
-    // 3. Chạy BFS từ từng điểm để tính khoảng cách đến các điểm còn lại
-    for (int i = 0; i < N; i++) {
-        // Chạy BFS lan truyền từ điểm i ra toàn bản đồ
-        std::vector<std::vector<int>> distMap = BFS(pMap, points[i]);
-
-        for (int j = 0; j < N; j++) {
-            if (i == j) {
-                matrix[i][j] = 0;
-            } else {
-                // Lấy khoảng cách từ bản đồ BFS tại tọa độ của điểm j
-                int d = distMap[points[j].row][points[j].col];
-                matrix[i][j] = d;
-            }
-        }
+    // Trường hợp biên: Nếu chỉ có điểm xuất phát (N = 1) hoặc không có điểm nào
+    if (N <= 1) {
+        solution.totalSteps = 0;
+        return solution;
     }
 
-    // 4. In Ma trận Tri thức ra Console (để kiểm tra - đúng yêu cầu Bài toán 1)
-    std::cout << "Ma Tran Tri Thuc (Insight Matrix):" << std::endl;
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            std::cout << std::setw(4) << matrix[i][j];
-        }
-        std::cout << std::endl;
-    }
-    std::cout << "-----------------------------------------------------" << std::endl;
-
-    return matrix;
+    // Gọi thuật toán Quy hoạch động với Bitmask
+    SolveTSP_DP(matrix, solution);
+    return solution;
 }
 
-DestinyResult ThienCoEngine::CalculateDestiny(const std::vector<std::vector<int>>& dist) {
-    std::cout << "\n--- [THIEN CO ENGINE] KHOI DONG HE THONG DINH MENH (TSP) ---" << std::endl;
+// THUẬT TOÁN DP BITMASK GIẢI BÀI TOÁN TSP
+void ThienCoEngine::SolveTSP_DP(const Matrix& matrix, Solution& solution) {
+    int N = matrix.nodeCount;
+    int limitMask = 1 << N; // Tổng số trạng thái: 2^N
 
-    int N = dist.size(); // Số lượng địa điểm (bao gồm điểm xuất phát 0)
+    // 1. Khởi tạo bảng DP và bảng truy vết Parent
+    // dp[mask][u]: Chi phí nhỏ nhất để đi qua tập 'mask' và kết thúc tại 'u'
+    std::vector<std::vector<int>> dp(limitMask, std::vector<int>(N, INF));
     
-    // DP State: dp[mask][u] là chi phí nhỏ nhất để đi qua tập hợp các điểm trong 'mask', kết thúc tại điểm 'u'
-    // Mask là một số nguyên biểu diễn nhị phân. Ví dụ: 0101 nghĩa là đã đi qua điểm 0 và điểm 2.
-    int numStates = 1 << N; // 2^N trạng thái
-    std::vector<std::vector<int>> dp(numStates, std::vector<int>(N, INF));
-    
-    // Traceback State: Để truy vết đường đi
-    std::vector<std::vector<int>> parent(numStates, std::vector<int>(N, -1));
+    // parent[mask][u]: Lưu node trước đó đã đi để đến được 'u' với trạng thái 'mask'
+    std::vector<std::vector<int>> parent(limitMask, std::vector<int>(N, -1));
 
-    // Trạng thái cơ sở: Bắt đầu tại điểm 0 (mask = 1, u = 0), chi phí = 0
+    // 2. Trạng thái cơ sở (Base Case)
+    // Bắt đầu tại node 0 (Start Point), mask chỉ có bit 0 bật
     dp[1][0] = 0;
 
+    // 3. Quy hoạch động với Bitmask
     // Duyệt qua tất cả các trạng thái (mask)
-    for (int mask = 1; mask < numStates; mask++) {
-        // Duyệt qua điểm kết thúc hiện tại (u)
-        for (int u = 0; u < N; u++) {
-            // Nếu điểm u có trong mask (bit thứ u của mask bật)
+    for (int mask = 1; mask < limitMask; ++mask) {
+        
+        // Duyệt qua node cuối cùng 'u' trong tập mask hiện tại
+        for (int u = 0; u < N; ++u) {
+            
+            // Nếu u có trong mask (bit thứ u bật)
             if ((mask & (1 << u))) {
                 
-                // Thử đi tiếp đến điểm v
-                for (int v = 0; v < N; v++) {
-                    // Nếu điểm v CHƯA có trong mask (chưa thăm)
-                    if (!(mask & (1 << v))) {
-                        int nextMask = mask | (1 << v); // Bật bit v lên
-                        int newCost = dp[mask][u] + dist[u][v];
+                // Nếu trạng thái này chưa tới được, bỏ qua
+                if (dp[mask][u] == INF) continue;
 
-                        // Nếu tìm được đường ngắn hơn, cập nhật DP
-                        if (dist[u][v] != -1 && newCost < dp[nextMask][v]) { // dist != -1 để đảm bảo có đường
-                            dp[nextMask][v] = newCost;
-                            parent[nextMask][v] = u; // Lưu lại: đến v từ u
+                // Thử đi tiếp đến node 'v' kế tiếp
+                for (int v = 0; v < N; ++v) {
+                    
+                    // Nếu v chưa có trong mask (chưa thăm)
+                    if (!(mask & (1 << v))) {
+                        
+                        // Tính mask mới khi thêm v
+                        int nextMask = mask | (1 << v);
+                        
+                        // Kiểm tra khoảng cách u->v có hợp lệ không
+                        int distUV = matrix.distances[u][v];
+                        if (distUV != INF && distUV != -1) {
+                            
+                            // Tối ưu hóa (Relaxation):
+                            // Nếu đường mới đi qua v ngắn hơn đường cũ đã biết
+                            if (dp[nextMask][v] > dp[mask][u] + distUV) {
+                                dp[nextMask][v] = dp[mask][u] + distUV;
+                                parent[nextMask][v] = u; // Lưu vết: Để đến v ở trạng thái nextMask, ta đi từ u
+                            }
                         }
                     }
                 }
@@ -135,52 +178,72 @@ DestinyResult ThienCoEngine::CalculateDestiny(const std::vector<std::vector<int>
         }
     }
 
-    // --- TÌM KẾT QUẢ TỐI ƯU ---
-    // Trạng thái cuối cùng là mask full (tất cả bit đều bật) = (1 << N) - 1
-    // Chúng ta cần tìm min(dp[fullMask][i]) với i là bất kỳ điểm nào (vì đề bài không yêu cầu quay về)
-    
-    int fullMask = numStates - 1;
-    int minCost = INF;
-    int lastNode = -1;
+    // 4. Tìm kết quả tốt nhất
+    // Trạng thái đích: Mask full bit 1 (tất cả các bit đều bật) -> Đã thăm hết N node
+    int fullMask = limitMask - 1;
+    int minTotalSteps = INF;
+    int bestLastNode = -1;
 
-    for (int i = 1; i < N; i++) { // Kết thúc ở bất kỳ Trận Nhãn nào (từ 1 đến N-1)
-        if (dp[fullMask][i] < minCost) {
-            minCost = dp[fullMask][i];
-            lastNode = i;
+    // Điểm kết thúc có thể là bất kỳ Shrine nào
+    // Duyệt tất cả các node 'i' để xem kết thúc ở đâu là tối ưu nhất
+    for (int i = 1; i < N; ++i) { // i chạy từ 1 vì node 0 là Start
+        if (dp[fullMask][i] < minTotalSteps) {
+            minTotalSteps = dp[fullMask][i];
+            bestLastNode = i;
         }
     }
 
-    // --- TRUY VẾT (TRACEBACK) ---
-    DestinyResult result;
-    if (minCost == INF) {
-        std::cout << "[CANH BAO] Khong tim thay duong di qua tat ca cac diem!" << std::endl;
-        result.totalSteps = -1;
-        return result;
+    // 5. Lưu kết quả vào Solution
+    solution.totalSteps = minTotalSteps;
+    std::cout << "[AI] Số bước tối ưu: " << minTotalSteps << std::endl;
+    // Truy vết lại đường đi từ kết quả DP
+    solution.pathSequence = TracebackPath(dp, parent, N, fullMask, bestLastNode);
+}
+
+// TRUY VẾT ĐƯỜNG ĐI (TRACEBACK PATH)
+std::vector<int> ThienCoEngine::TracebackPath(const std::vector<std::vector<int>>& dp, 
+                                              const std::vector<std::vector<int>>& parent,
+                                              int nodeCount, int finalMask, int lastNode) 
+{
+    std::vector<int> path;
+
+    // Trường hợp không tìm thấy đường đi
+    if (lastNode == -1 || dp[finalMask][lastNode] >= INF) {
+        std::cout << "[AI] Không tìm thấy giải pháp!" << std::endl;
+        return path; // Trả về rỗng
     }
 
-    result.totalSteps = minCost;
-    
-    // Lần ngược từ cuối về đầu
-    int currMask = fullMask;
+    int currMask = finalMask;
     int currNode = lastNode;
 
+    // Lần ngược từ trạng thái cuối về trạng thái đầu
     while (currNode != -1) {
-        result.pathOrder.push_back(currNode);
+        path.push_back(currNode);
+        
         int prevNode = parent[currMask][currNode];
-        currMask = currMask ^ (1 << currNode); // Tắt bit hiện tại
+        
+        // Loại bỏ bit của currNode ra khỏi mask để quay về trạng thái trước
+        int prevMask = currMask ^ (1 << currNode);
+        
         currNode = prevNode;
+        currMask = prevMask;
+        
+        // Nếu quay về mask = 0 thì dừng
+        if (currMask == 0) break;
     }
+    
+    // Thêm điểm xuất phát (Node 0) vào cuối danh sách
+    if (path.back() != 0) path.push_back(0);
 
-    // Đảo ngược lại để có thứ tự đúng: 0 -> ... -> ...
-    std::reverse(result.pathOrder.begin(), result.pathOrder.end());
+    // Đảo ngược vector để có thứ tự đúng
+    std::reverse(path.begin(), path.end());
 
-    // --- IN KẾT QUẢ RA CONSOLE (CHUẨN BÀI TOÁN 2) ---
-    std::cout << "Thien Menh (S_optimal): " << result.totalSteps << " buoc." << std::endl;
-    std::cout << "Lo Trinh Chien Luoc: ";
-    for (size_t i = 0; i < result.pathOrder.size(); i++) {
-        std::cout << result.pathOrder[i] << (i < result.pathOrder.size() - 1 ? " -> " : "");
+    // In lộ trình để kiểm tra (debug)
+    std::cout << "Chuỗi đường đi tối ưu: ";
+    for (int i = 0; i < (int)path.size() - 1; i++) {
+        std::cout << path[i] << " -> ";
     }
-    std::cout << "\n------------------------------------------------------------" << std::endl;
+    std::cout << path.back() << std::endl;
 
-    return result;
+    return path;
 }

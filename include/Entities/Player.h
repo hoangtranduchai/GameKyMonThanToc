@@ -1,58 +1,73 @@
 #pragma once
-#include "GameObject.h"
 
-// Thêm enum để quản lý trạng thái chuyên nghiệp
-enum PlayerState {
-    STATE_IDLE,
-    STATE_RUN,
+#include "Entities/GameObject.h"
+#include "Core/Config.h"
+
+// ENUM: ĐỊNH HƯỚNG DI CHUYỂN
+enum class PlayerDirection {
+    DOWN  = 0,
+    UP    = 1,
+    LEFT  = 2,
+    RIGHT = 3
 };
 
-enum PlayerDirection {
-    DIR_DOWN,
-    DIR_LEFT,
-    DIR_RIGHT,
-    DIR_UP
-};
-
-// Player kế thừa từ GameObject: Sở hữu mọi thuộc tính của một vật thể game
+// CLASS: Player
 class Player : public GameObject {
 public:
-    // Constructor sử dụng LoaderParams từ lớp cha
+    // Hàm khởi tạo sử dụng LoaderParams từ lớp cha
     Player(const LoaderParams* pParams);
     
-    virtual ~Player() {}
+    ~Player() override;
 
-    // Hiện thực hóa các phương thức thuần ảo
-    virtual void Draw();
-    virtual void Update();
-    virtual void Clean();
+    // Vẽ nhân vật lên màn hình
+    void Draw() override;
 
-    // Hàm teleport dùng cho Undo
-    void SetPosition(int x, int y);
+    // Cập nhật logic nhân vật (Input -> Move -> Animation)
+    void Update() override;
+
+    // Dọn dẹp tài nguyên (nếu có)
+    void Clean() override;
+
+    // Thiết lập lại vị trí nhân vật
+    void SetPosition(float x, float y);
 
 private:
-    // Hàm xử lý input riêng cho Player
+    // Hàm xử lý đầu vào bàn phím
     void HandleInput();
     
-    // --- BIẾN LOGIC DI CHUYỂN ---
-    Uint32 m_lastMoveTime; 
-    const int MOVE_DELAY = 130; // Move cooldown in milliseconds (controls movement speed)
-
-    // --- BIẾN VISUAL AAA (Giữ lại để mượt mà) ---
-    float m_visualX;
-    float m_visualY;
-    const float SMOOTH_SPEED = 15.0f; // Độ mượt khi nội suy
-    float m_scale;                    // Tỷ lệ phóng to nhân vật
+    // Cập nhật hoạt ảnh
+    void UpdateAnimation();
     
-    // --- BIẾN ANIMATION ---
-    int m_animSpeed;
-    int m_numFrames;
+    // Xử lý di chuyển vật lý
+    void HandleMovement(float dt);
 
-    // --- QUẢN LÝ TRẠNG THÁI ---
-    PlayerState m_currentState;
-    PlayerState m_lastState;
-    PlayerDirection m_currentDirection;
-    PlayerDirection m_lastDirection;
+    // Xử lý tương tác với ô gạch (tiles)
+    void ProcessTileInteraction();
+
+    // Hiệu ứng rơi xuống vực
+    void Falling();
+
+    // Vận tốc (Pixel/Giây)
+    float m_velX, m_velY;
+
+    // Trạng thái hướng hiện tại
+    PlayerDirection m_currentDir;
+
+    // Lưu hướng cuối cùng khi dừng lại (để hiển thị Idle đúng hướng)
+    PlayerDirection m_lastDir;
+
+    // Cờ đánh dấu đang di chuyển hay đứng yên
+    bool m_isMoving;
+
+    // Cờ đánh dấu đang trong quá trình rơi
+    bool m_isFalling;
+
+    // Thời gian đã trôi qua kể từ lúc bắt đầu rơi
+    float m_fallTimer;
+
+    // Tốc độ rơi (Co giãn nhỏ dần hoặc tụt xuống theo trục Y)
+    const float FALL_DURATION = 1.5f; // Rơi trong 1.5 giây thì chuyển màn hình thua
     
-    void UpdateAnimationID();
+    // Tọa độ lúc bắt đầu rơi
+    float m_fallStartY;
 };

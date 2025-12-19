@@ -1,55 +1,109 @@
-#include "SoundManager.h"
+#include "Audio/SoundManager.h"
+#include <iostream>
 
-bool SoundManager::LoadMusic(const std::string& fileName, const std::string& id) {
-    Mix_Music* pMusic = Mix_LoadMUS(fileName.c_str());
-    if (pMusic == nullptr) {
-        std::cout << "[Loi Audio] Khong the tai nhac: " << fileName << " - " << Mix_GetError() << std::endl;
+// Khởi tạo con trỏ Singleton
+SoundManager* SoundManager::s_Instance = nullptr;
+
+SoundManager* SoundManager::GetInstance() {
+    if (s_Instance == nullptr) s_Instance = new SoundManager();
+    return s_Instance;
+}
+
+SoundManager::SoundManager() {
+    std::cout << "[ÂM THANH] Đang khởi tạo hệ thống âm thanh..." << std::endl;
+}
+
+SoundManager::~SoundManager() { Clean(); }
+
+bool SoundManager::Init() {
+    // 1. Cấu hình thiết bị âm thanh
+    // - Tần số lấy mẫu (Frequency): 44100 Hz (Chuẩn chất lượng đĩa CD)
+    // - Định dạng (Format): MIX_DEFAULT_FORMAT (16-bit signed)
+    // - Số kênh (Channels): 2 (Stereo)
+    // - Kích thước chunk: 2048 bytes (Cân bằng giữa độ trễ thấp và hiệu suất)
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        std::cerr << "[LỖI NGHIÊM TRỌNG] Không thể khởi tạo SDL_mixer! Lỗi: " << Mix_GetError() << std::endl;
         return false;
     }
-    m_musicMap.emplace(id, pMusic);
+
+    // 2. Thiết lập âm lượng mặc định: Âm lượng tối đa
+    // Phạm vi âm lượng SDL_mixer: 0 -> 128
+    Mix_VolumeMusic(128);       // Tối đa cho nhạc nền
+    Mix_Volume(-1, 128);        // Tối đa cho tất cả kênh SFX (-1 là tất cả kênh)
+
+    std::cout << "[ÂM THANH] Khởi tạo thành công. Trạng thái: BẬT (Âm lượng tối đa)." << std::endl;
+    return true;
+}
+
+void SoundManager::Clean() {
+    // 1. Giải phóng nhạc nền (BGM)
+    for (auto const& [id, music] : m_musicMap) Mix_FreeMusic(music);
+    m_musicMap.clear();
+
+    // 2. Giải phóng hiệu ứng âm thanh (SFX)
+    for (auto const& [id, chunk] : m_sfxMap) Mix_FreeChunk(chunk);
+    m_sfxMap.clear();
+
+    // 3. Đóng thiết bị âm thanh
+    Mix_CloseAudio();
+    std::cout << "[ÂM THANH] Hệ thống đã được dọn dẹp và tắt." << std::endl;
+}
+
+bool SoundManager::LoadMusic(const std::string& fileName, const std::string& id) {
+    // Tải file nhạc (chế độ phát trực tiếp - Stream mode)
+    Mix_Music* pMusic = Mix_LoadMUS(fileName.c_str());
+    if (pMusic == nullptr) {
+        std::cerr << "[LỖI] Không thể tải nhạc nền: " << fileName << " | Lỗi: " << Mix_GetError() << std::endl;
+        return false;
+    }
+
+    // Lưu vào Map
+    m_musicMap[id] = pMusic;
     return true;
 }
 
 bool SoundManager::LoadSFX(const std::string& fileName, const std::string& id) {
+    // Tải file hiệu ứng (tải vào RAM)
     Mix_Chunk* pChunk = Mix_LoadWAV(fileName.c_str());
     if (pChunk == nullptr) {
-        std::cout << "[Loi Audio] Khong the tai SFX: " << fileName << " - " << Mix_GetError() << std::endl;
+        std::cerr << "[LỖI] Không thể tải hiệu ứng âm thanh: " << fileName << " | Lỗi: " << Mix_GetError() << std::endl;
         return false;
     }
-    m_sfxMap.emplace(id, pChunk);
+
+    // Lưu vào Map
+    m_sfxMap[id] = pChunk;
     return true;
 }
 
-void SoundManager::PlayMusic(const std::string& id, int loop) noexcept {
-    auto it = m_musicMap.find(id);
-    if (it != m_musicMap.end() && it->second != nullptr) {
-        Mix_PlayMusic(it->second, loop);
+void SoundManager::PlayMusic(const std::string& id) {
+    // Tìm nhạc trong Map
+    if (m_musicMap.find(id) != m_musicMap.end()) {
+        Mix_PlayMusic(m_musicMap[id], -1); // -1 = Lặp vô tận
+    } else {
+        std::cerr << "[CẢNH BÁO] Không tìm thấy ID nhạc nền: " << id << std::endl;
     }
 }
 
-void SoundManager::PlaySFX(const std::string& id) noexcept {
-    auto it = m_sfxMap.find(id);
-    if (it != m_sfxMap.end() && it->second != nullptr) {
-        Mix_PlayChannel(-1, it->second, 0);
+void SoundManager::PlaySFX(const std::string& id) {
+    // Tìm SFX trong Map
+    if (m_sfxMap.find(id) != m_sfxMap.end()) {
+        Mix_PlayChannel(-1, m_sfxMap[id], 0); // 0 = Phát 1 lần
+    } else {
+        std::cerr << "[CẢNH BÁO] Không tìm thấy ID hiệu ứng âm thanh: " << id << std::endl;
     }
 }
 
-void SoundManager::SetMusicVolume(int volume) noexcept {
-    Mix_VolumeMusic(volume);  // 0-128
-}
-
-void SoundManager::Clean() noexcept {
-    // Xóa SFX
-    for (auto const& [key, val] : m_sfxMap) {
-        Mix_FreeChunk(val);
+// CHỨC NĂNG BẬT/TẮT ÂM THANH
+void SoundManager::SetMute(bool isMuted) {
+    if (isMuted) {
+        // Tắt tiếng: Đặt âm lượng về 0
+        Mix_VolumeMusic(0);
+        Mix_Volume(-1, 0); // -1 là tất cả kênh SFX
+        std::cout << "[ÂM THANH] Đã tắt tiếng." << std::endl;
+    } else {
+        // Bật tiếng: Set volume về Max (128)
+        Mix_VolumeMusic(128);
+        Mix_Volume(-1, 128);
+        std::cout << "[ÂM THANH] Đã bật tiếng." << std::endl;
     }
-    m_sfxMap.clear();
-
-    // Xóa Music
-    for (auto const& [key, val] : m_musicMap) {
-        Mix_FreeMusic(val);
-    }
-    m_musicMap.clear();
-    
-    std::cout << "[He thong] Da don dep Sound Manager!" << std::endl;
 }

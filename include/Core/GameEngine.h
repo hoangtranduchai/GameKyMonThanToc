@@ -1,198 +1,178 @@
 #pragma once
+
+// THƯ VIỆN CHUẨN & SDL
 #include <SDL.h>
 #include <SDL_image.h>
 #include <SDL_ttf.h>
 #include <SDL_mixer.h>
 #include <iostream>
 #include <vector>
-#include "TextureManager.h"
-#include "Map.h"
 #include <stack>
-#include <utility>
+#include <string>
+#include <memory>
 
-// Forward Declaration để tránh lỗi vòng lặp include
-class IGameState;
+// CÁC MODULE HỆ THỐNG
+#include "Graphics/TextureManager.h"
+#include "Entities/Map.h"
+
+// Khai báo tiền (Forward Declaration) để tránh vòng lặp include
 class Player;
+class ThienCoEngine;
 
-// Định nghĩa các giai đoạn của một kiệt tác
+// TRẠNG THÁI GAME (GAME STATES)
 enum GameState {
-    STATE_MENU,     // Màn hình chờ: Nơi cảm xúc bắt đầu
-    STATE_PLAY,     // Màn hình chơi: Nơi trí tuệ thăng hoa
-    STATE_PAUSE,    // Màn hình tạm dừng: Nơi tĩnh lặng
-    STATE_WIN       // Màn hình thắng: Nơi vinh quang tỏa sáng
+    STATE_INTRO,            // Màn hình giới thiệu
+    STATE_STORY_NAME,       // Màn hình hiển thị tên màn chơi
+    STATE_STORY_SENSEI,     // Màn hình hiển thị lời dạy của thầy
+    STATE_PLAY,             // Trạng thái chơi game
+    STATE_RESULT_S,         // Màn hình kết quả thắng rank S
+    STATE_RESULT_A,         // Màn hình kết quả thắng rank A
+    STATE_RESULT_LOSE       // Màn hình kết quả thua
 };
 
-// Cấu trúc Snapshot: Lưu giữ khoảnh khắc lịch sử
+// SNAPSHOT (DÙNG CHO TÍNH NĂNG HOÀN TÁC - UNDO)
+// Lưu lại trạng thái của nhân vật và bản đồ tại một thời điểm
 struct GameStateMoment {
-    int playerGridRow;       // Vị trí dòng của Player
-    int playerGridCol;       // Vị trí cột của Player
-    int currentSteps;        // Số bước chân
-    int shrinesCollected;    // Số lượng đã thu thập
+    int playerGridRow;       // Vị trí dòng của nhân vật trên lưới (đơn vị: ô lưới)
+    int playerGridCol;       // Vị trí cột của nhân vật trên lười (đơn vị: ô lười)
+    int currentSteps;        // Số bước đi hiện tại
+    int shrinesCollected;    // Số trận nhãn đã thu thập
+    
+    // Danh sách tọa độ các trận nhãn đã được kích hoạt tại thời điểm này
     std::vector<std::pair<int, int>> visitedShrinesSnapshot;
 };
 
+// CLASS: GameEngine (MẪU THIẾT KẾ SINGLETON)
 class GameEngine {
 public:
-    // Mẫu thiết kế Singleton: Trả về thể hiện duy nhất
+    // Đảm bảo chỉ có duy nhất một thể hiện của GameEngine tồn tại trong toàn chương trình
     static GameEngine* GetInstance();
-    
-    // Hàm hủy Instance
     static void DestroyInstance();
 
-    // Cập nhật hàm Init để nhận thông tin cửa sổ
-    bool Init(const char* title, int x, int y, int w, int h, bool fullscreen);
+    // VÒNG ĐỜI ỨNG DỤNG (APPLICATION LIFECYCLE)
     
+    // Khởi tạo toàn bộ hệ thống (SDL, Cửa sổ, Bộ kết xuất, Tài nguyên)
+    // Trả về true nếu thành công, false nếu thất bại
+    bool Init(const char* title, int xPos, int yPos, int width, int height, bool fullscreen);
+
+    // Xử lý sự kiện đầu vào (Bàn phím, Sự kiện cửa sổ)
+    void HandleEvents();
+
+    // Cập nhật logic game (AI, Vật lý, Hoạt ảnh, Chuyển đổi trạng thái)
+    void Update();
+
+    // Vẽ toàn bộ khung hình hiện tại lên màn hình
+    void Render();
+
+    // Dọn dẹp tài nguyên trước khi thoát (Giải phóng bộ nhớ)
+    void Clean();
+
+    // Thoát khỏi game
     void Quit();
 
-    // "Nhịp đập" của Kiệt tác (Vòng lặp Game)
-    void HandleEvents(); // Xử lý Input
-    void Update();       // Cập nhật Logic
-    void Render();       // Vẽ Đồ họa
+    // Kiểm tra game còn chạy không (để duy trì vòng lặp chính)
+    bool IsRunning() const { return m_bRunning; }
 
-    // Hàm kiểm tra trạng thái
-    bool IsRunning() {
-        return m_bRunning;
-    }
+    // HỆ THỐNG TRUY CẬP (GETTERS)
+    
+    SDL_Renderer* GetRenderer() const { return m_pRenderer; }
 
-    SDL_Renderer* GetRenderer() const {
-        return m_pRenderer;
-    }
-    float GetDeltaTime() const {
-        return m_deltaTime;
-    }
+    // Thời gian giữa 2 khung hình (Delta Time) - Dùng cho hoạt ảnh
+    float GetDeltaTime() const { return m_deltaTime; }
 
-    int GetWindowWidth() const {
-        return m_windowWidth;
-    }
+    // Truy cập các đối tượng game
+    Map* GetMap() const { return m_pMap; }
+    Player* GetPlayer() const { return m_pPlayer; }
 
-    int GetWindowHeight() const {
-        return m_windowHeight;
-    }
+    // ĐIỀU KHIỂN LOGIC TRÒ CHƠI (GAMEPLAY LOGIC CONTROL)
 
-    // Player có thể truy cập Map
-    Map* GetMap() const {
-        return m_pMap;
-    }
-
-    // Getter cho UI sau này
-    int GetOptimalSteps() const {
-        return m_optimalSteps;
-    }
-
-    // Xóa bỏ Copy Constructor và Assignment Operator (Singleton Pattern)
-    GameEngine(const GameEngine&) = delete;
-    GameEngine& operator=(const GameEngine&) = delete;
-
-    // --- CÁC HÀM GAMEPLAY LOGIC ---
-    void OnPlayerMove(); 
-    void OnShrineVisited(int row, int col); 
-
-    int GetCurrentSteps() const {
-        return m_currentSteps;
-    }
-
-    int GetShrinesCollected() const {
-        return m_shrinesCollected;
-    }
-
-    int GetTotalShrines() const {
-        return m_totalShrines;
-    }
-
-    // --- HỆ THỐNG HỒI TƯỞNG (UNDO) ---
-    void SaveState(); 
-    void Undo();      
-
-    // Hàm Reset game để chơi lại từ đầu
-    void ResetGame();
-
-    // Hàm chuyển đổi trạng thái mượt mà
+    // Chuyển đổi trạng thái game (có lưu lịch sử để hoàn tác, có hiệu ứng chuyển cảnh)
     void SwitchState(GameState newState);
 
-    // --- HỆ THỐNG LEVEL (KHAI BÁO 1 LẦN DUY NHẤT Ở ĐÂY) ---
-    void LoadLevel(int levelIndex);
-    void NextLevel();
+    // Hệ thống quản lý cấp độ (Level Management)
+    void LoadLevel(int levelIndex); // Tải màn chơi theo chỉ số
+    void NextLevel();               // Chuyển sang màn kế tiếp
 
-    // Toggle Admin Mode
-    void ToggleAdminMode();
+    // Các tính năng trò chơi (Gameplay Features)
+    void SaveState();   // Lưu trạng thái hiện tại vào ngăn xếp (Stack)
+    void Undo();        // Xử lý hoàn tác tổng hợp
+    void ToggleAudio(); // Bật/tắt âm thanh
+
+    // Xử lý sự kiện gameplay
+    void OnPlayerMove();                    // Gọi khi nhân vật di chuyển
+    void OnShrineVisited(int row, int col); // Gọi khi nhân vật thu thập trận nhãn
+
+    // QUẢN LÝ THÔNG SỐ TRÒ CHƠI (GAMEPLAY STATISTICS)
+    int GetCurrentSteps() const { return m_currentSteps; }
+    int GetOptimalSteps() const { return m_optimalSteps; }
+    int GetShrinesCollected() const { return m_shrinesCollected; }
+    int GetTotalShrines() const { return m_totalShrines; }
 
 private:
-    // Private constructor cho Singleton
+    // Hàm khởi tạo riêng tư (Mẫu thiết kế Singleton)
     GameEngine();
     ~GameEngine();
 
     // Biến tĩnh lưu trữ thể hiện duy nhất
     static GameEngine* s_Instance;
 
-    // Thời gian giữa các khung hình
-    float m_deltaTime;
-
-    // Lưu trữ các trạng thái game
-    std::vector<IGameState*> m_States;
-    bool m_bRunning;
-    SDL_Window* m_pWindow;
-    SDL_Renderer* m_pRenderer;
+    // CÁC THÀNH PHẦN CỐT LÕI (CORE COMPONENTS)
+    bool m_bRunning;                // Cờ kiểm soát vòng lặp game
+    SDL_Window* m_pWindow;          // Cửa sổ ứng dụng
+    SDL_Renderer* m_pRenderer;      // Bộ kết xuất đồ họa
     
-    // Kích thước cửa sổ
-    int m_windowWidth;
-    int m_windowHeight;
+    int m_windowWidth;              // Chiều rộng cửa sổ
+    int m_windowHeight;             // Chiều cao cửa sổ
 
-    // Con trỏ đến Player
-    Player* m_pPlayer;
+    float m_deltaTime;              // Thời gian trôi qua giữa khung hình trước và khung hình hiện tại (giây)
+    Uint64 m_lastTime;              // Mốc thời gian của khung hình trước
+    Uint64 m_performanceFrequency;  // Tần số bộ đếm hiệu suất CPU
 
-    // Con trỏ đến Map
-    Map* m_pMap;
+    // CÁC ĐỐI TƯỢNG GAME (GAME OBJECTS)
+    Player* m_pPlayer;              // Nhân vật chính
+    Map* m_pMap;                    // Bản đồ (Tilemap)
 
-    // Số bước tối ưu
-    int m_optimalSteps;
+    // QUẢN LÝ CẤP ĐỘ (LEVEL MANAGEMENT)
+    int m_currentLevelIdx;                  // Chỉ số cấp độ hiện tại (bắt đầu từ 1, 2, 3...)
+    std::vector<std::string> m_levelFiles;  // Danh sách đường dẫn file bản đồ
 
-    // Biến Gameplay
-    int m_currentSteps;      
-    int m_shrinesCollected;  
-    int m_totalShrines;      
-    
-    std::vector<std::pair<int, int>> m_visitedShrinesList;
+    int m_currentSteps;             // Số bước người chơi đã đi
+    int m_optimalSteps;             // Số bước tối ưu (tính bằng thuật toán AI ThienCoEngine)
+    int m_shrinesCollected;         // Số trận nhãn đã thu thập
+    int m_totalShrines;             // Tổng số trận nhãn trong bản đồ
+    std::vector<std::pair<int, int>> m_visitedShrinesList; // Danh sách tọa độ trận nhãn đã thu thập
 
-    // Ngăn xếp lịch sử (Stack)
+    // Ngăn xếp hoàn tác cho gameplay (Lưu các bước đi)
     std::stack<GameStateMoment> m_historyStack;
-
-    // Biến lưu trạng thái hiện tại
-    GameState m_currentState;
     
-    // Biến hiệu ứng nhấp nháy
-    float m_blinkTimer;
+    // Ngăn xếp hoàn tác cho trạng thái (Lưu các màn hình đã qua)
+    std::stack<GameState> m_stateHistory;
 
-    // --- HỆ THỐNG PARALLAX SKY AAA ---
-    float m_cloudScrollX_1; 
-    float m_cloudScrollX_2; 
+    // QUẢN LÝ TRẠNG THÁI (STATE MANAGEMENT)
+    GameState m_currentState; // Trạng thái hiện tại
+    GameState m_nextState;  // Trạng thái chờ chuyển đến
     
-    const float CLOUD_SPEED_1 = 15.0f; 
-    const float CLOUD_SPEED_2 = 35.0f; 
+    // HIỆU ỨNG HÌNH ẢNH (VISUAL EFFECTS)
 
-    // Hàm vẽ HUD
-    void DrawHUD();
+    // Hiệu ứng chuyển cảnh (Transition - mờ dần)
+    float m_fadeAlpha;      // Độ mờ của lớp phủ màu đen (0.0 -> 255.0)
+    bool m_isFadingIn;      // Đang sáng dần lên?
+    bool m_isFadingOut;     // Đang tối dần đi?
+    const float FADE_SPEED = 2.5f; // Tốc độ hiệu ứng chuyển cảnh
 
-    // Biến quản lý Fade
-    float m_fadeAlpha; 
-    bool m_isFadingIn; 
-    bool m_isFadingOut; 
-
-    // --- BIẾN QUẢN LÝ CHUYỂN CẢNH AAA ---
-    GameState m_nextState; 
-    const float FADE_SPEED = 2.0f;
-
-    // --- BIẾN CHO VICTORY FLOW (AAA POLISH) ---
+    // Chuỗi hiệu ứng chiến thắng (Victory Sequence)
     bool m_isWinningSequence; 
-    float m_winDelayTimer;    
+    float m_winDelayTimer;
 
-    // --- HỆ THỐNG UI AAA ---
-    void DrawStylishBox(int x, int y, int w, int h, std::string title = "");
-    void DrawButton(std::string text, int x, int y, int w, int h, bool isSelected);
+    // Trạng thái âm thanh
+    bool m_isMuted = true;
+    
+    // Biến lưu ID hình ảnh ngẫu nhiên cho các vòng sau vòng 3
+    std::string m_randomRankImageID;
 
-    int m_menuSelection; 
-    bool m_isAdminMode;
-
-    // --- HỆ THỐNG LEVEL (BIẾN DỮ LIỆU) ---
-    std::vector<std::string> m_levelFiles; 
-    int m_currentLevelIdx;                 
+    // CÁC HÀM TRỢ GIÚP (HELPER FUNCTIONS)
+    // Các hàm vẽ nội bộ
+    void DrawBackground();  // Vẽ nền
+    std::string GetCurrentStoryImageID(const std::string& suffix) const; // Hàm lấy ID hình ảnh theo cấp độ
+    void HandleStoryInput(SDL_Event& event); // Xử lý phím ENTER chung cho các màn hình cốt truyện
 };
