@@ -1,548 +1,103 @@
-################################################################################
-# .gitignore - File cấu hình bỏ qua (Ignore Configuration File)
-# Dự án: Game Kỳ Môn Thần Tốc
-# Mục đích: Loại trừ các file không cần thiết khỏi version control
-# Ngôn ngữ: C++ với CMake Build System
-################################################################################
-
-#==============================================================================
-# PHẦN I: BUILD ARTIFACTS - Sản phẩm biên dịch (Compilation Outputs)
-#==============================================================================
-
-# Thư mục build chính - Chứa toàn bộ output của quá trình build
-build/
-Build/
-BUILD/
-
-# Thư mục build CMake tùy chỉnh - Custom build directories
-cmake-build-*/
-cmake-build-debug/
-cmake-build-release/
-cmake-build-relwithdebinfo/
-cmake-build-minsizerel/
-
-# Thư mục output riêng theo cấu hình - Configuration-specific outputs
-out/
-bin/
-obj/
-lib/
-dist/
-release/
-debug/
-
-# File thực thi (Executable files)
-*.exe
-*.out
-*.app
-*.bin
-
-# File object - Kết quả biên dịch từng file nguồn
-*.o
-*.obj
-*.lo
-*.slo
-
-# File thư viện tĩnh (Static libraries)
-*.a
-*.lib
-*.lai
-*.la
-
-# File thư viện động (Shared/Dynamic libraries)
-*.so
-*.so.*
-*.dylib
-*.dll
-*.pyd
-
-# File pre-compiled headers - Header đã biên dịch trước để tăng tốc build
-*.gch
-*.pch
-
-# File module compiled - Module đã biên dịch
-*.mod
-*.smod
-
-# File interface - File giao diện module Fortran
-*.ifc
-
-#==============================================================================
-# PHẦN II: CMAKE - Hệ thống quản lý build đa nền tảng
-#==============================================================================
-
-# File cache CMake - Lưu trữ cấu hình và biến môi trường
-CMakeCache.txt
-CMakeCache.txt.bak
-
-# Thư mục files CMake - Chứa các file nội bộ của CMake
-CMakeFiles/
-CMakeScripts/
-CMakeScratch/
-
-# File cài đặt CMake - Script tự động sinh cho việc cài đặt
-cmake_install.cmake
-install_manifest.txt
-install_manifest_*.txt
-
-# Thư mục testing CMake - CTest outputs
-Testing/
-CTestTestfile.cmake
-DartConfiguration.tcl
-
-# File CPack - Packaging outputs
-CPackConfig.cmake
-CPackSourceConfig.cmake
-_CPack_Packages/
-*.dmg
-*.rpm
-*.deb
-*.nupkg
-
-# Ninja build system files - Alternative build system
-*.ninja
-.ninja_deps
-.ninja_log
-rules.ninja
-
-# Makefile sinh tự động - Auto-generated makefiles
-Makefile
-cmake-build-*/Makefile
-
-# File package redirects - CMake vcpkg integration
-pkgRedirects/
-
-#==============================================================================
-# PHẦN III: COMPILER & DEBUGGER - Trình biên dịch và gỡ lỗi
-#==============================================================================
-
-# Precompiled headers - MSVC (Microsoft Visual C++)
-*.pch
-*.ipch
-*.idb
-*.pdb
-*.ilk
-
-# GCC - GNU Compiler Collection
-*.d
-*.gcda
-*.gcno
-*.gcov
-
-# Clang - LLVM Compiler
-*.profdata
-*.profraw
-
-# Intel C++ Compiler
-*.dyn
-*.dpi
-
-# Debug symbols - Thông tin debug riêng biệt
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Memory profiling - Phân tích bộ nhớ
-*.mem
-massif.out.*
-callgrind.out.*
-cachegrind.out.*
-
-# Core dumps - File dump khi chương trình crash
-core
-core.*
-*.core
-*.stackdump
-
-#==============================================================================
-# PHẦN IV: IDE & EDITORS - Môi trường phát triển tích hợp
-#==============================================================================
-
-# Visual Studio Code - Cấu hình workspace cá nhân
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
-.history/
-*.vsix
-
-# JetBrains IDEs (CLion, IntelliJ IDEA)
-.idea/
-*.iml
-*.iws
-*.ipr
-cmake-build-*/
-out/
-
-# Visual Studio - Microsoft IDE
+# ============================================================================
+# 1. VISUAL STUDIO & IDE GENERATED FILES (File sinh ra bởi IDE)
+# ============================================================================
+# Thư mục cấu hình ẩn của Visual Studio (Chứa setting người dùng, breakpoint...)
 .vs/
-*.suo
+
+# File cấu hình người dùng (User-specific options)
 *.user
 *.userosscache
 *.sln.docstates
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
-*.sln
-*.VC.db
-*.VC.VC.opendb
 
-# Visual Studio Build Results
-[Dd]ebug/
-[Dd]ebugPublic/
-[Rr]elease/
-[Rr]eleases/
+# File cơ sở dữ liệu intellisense (Code completion database)
+*.db
+*.opendb
+*.vc.db
+
+# File tạm của Solution (Solution User Options)
+*.suo
+
+# ============================================================================
+# 2. BUILD OUTPUT & INTERMEDIATE FILES (Sản phẩm biên dịch & File trung gian)
+# ============================================================================
+# Các thư mục chứa file binary sau khi build (Debug/Release)
+# Cấu trúc thường thấy: x64/Debug, x64/Release
 x64/
 x86/
-[Ww][Ii][Nn]32/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
-bld/
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
+Debug/
+Release/
+build/
+bin/
+obj/
 
-# Sublime Text - Text editor
-*.sublime-workspace
-*.sublime-project
+# File thực thi (Executables) - Chúng ta build lại từ code, không commit file exe
+*.exe
+*.out
+*.app
 
-# Vim - Text editor
-*.swp
-*.swo
-*~
-.*.sw?
-Session.vim
-.netrwhist
+# Thư viện liên kết động/tĩnh (Dynamic/Static Libraries) tạo ra khi build
+# Lưu ý: Nếu bạn có folder "Libraries" chứa dll bên thứ 3 cần commit, hãy dùng dấu ! để ngoại lệ
+*.dll
+*.lib
+*.so
+*.dylib
 
-# Emacs - Text editor
-*~
-\#*\#
-/.emacs.desktop
-/.emacs.desktop.lock
-*.elc
-auto-save-list
-tramp
-.\#*
+# File Debug Information (Thông tin gỡ lỗi)
+*.pdb
+*.idb
+*.ilk
 
-# Xcode - macOS IDE
-*.xcodeproj/
-*.xcworkspace/
-xcuserdata/
-*.moved-aside
-DerivedData/
+# File Object (Kết quả biên dịch từng file .cpp)
+*.obj
+*.o
 
-# Eclipse CDT - Cross-platform IDE
-.cproject
-.project
-.settings/
-.autotools
-.pydevproject
+# File lưu trữ biên dịch sẵn (Precompiled Headers)
+*.pch
+*.ipch
 
-# NetBeans - Java IDE
-nbproject/
-nbbuild/
-nbdist/
-.nb-gradle/
-
-# Code::Blocks - Lightweight IDE
-*.cbp
-*.layout
-*.depend
-
-#==============================================================================
-# PHẦN V: OPERATING SYSTEM - Hệ điều hành
-#==============================================================================
-
-# Windows - File hệ thống Windows
+# ============================================================================
+# 3. SYSTEM & OS FILES (File rác của Hệ điều hành)
+# ============================================================================
+# Windows thumbnail cache
 Thumbs.db
-Thumbs.db:encryptable
 ehthumbs.db
-ehthumbs_vista.db
 Desktop.ini
-$RECYCLE.BIN/
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-*.lnk
 
-# macOS - File hệ thống macOS
+# MacOS directory attributes
 .DS_Store
 .AppleDouble
 .LSOverride
-._*
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
 
-# Linux - File hệ thống Linux
-*~
-.directory
-.Trash-*
-.nfs*
+# ============================================================================
+# 4. VISUAL STUDIO CODE (Nếu có thành viên dùng VS Code)
+# ============================================================================
+.vscode/
 
-#==============================================================================
-# PHẦN VI: DEPENDENCIES & PACKAGES - Thư viện phụ thuộc
-#==============================================================================
-
-# vcpkg - C++ Package Manager
-vcpkg_installed/
-vcpkg/
-
-# Conan - C/C++ Package Manager
-conaninfo.txt
-conanbuildinfo.*
-conan.lock
-
-# Submodules - Git submodules được quản lý riêng
-# Bỏ comment nếu không muốn track submodules
-# libs/
-# external/
-# third_party/
-
-# Node modules (nếu dùng tools JavaScript/TypeScript)
-node_modules/
-package-lock.json
-yarn.lock
-
-#==============================================================================
-# PHẦN VII: TEMPORARY FILES - File tạm thời
-#==============================================================================
-
-# File backup và tạm thời
-*.bak
+# ============================================================================
+# 5. LOGS & TEMPORARY FILES (File nhật ký & Tạm)
+# ============================================================================
+*.log
+*.tlog
 *.tmp
-*.temp
-*.old
-*.orig
+*.bak
 *.swp
-*.swo
-*~
-*.log
-*.cache
 
-# Auto-save files
-\#*\#
-.\#*
+# ============================================================================
+# 6. ASSET INTERMEDIATES (File tạm của phần mềm đồ họa - Tùy chọn)
+# ============================================================================
+# Photoshop backup
+*.psdtmp
+# Blender backup
+*.blend1
+*.blend2
 
-# Patch files
-*.patch
-*.diff
-*.rej
-
-#==============================================================================
-# PHẦN VIII: LOGS & REPORTS - Nhật ký và báo cáo
-#==============================================================================
-
-# Log files - File ghi nhật ký
-*.log
-logs/
-*.log.*
-log.txt
-
-# Test reports - Báo cáo kiểm thử
-test-results/
-test-reports/
-coverage/
-*.gcov
-*.lcov
-
-# Profiling reports - Báo cáo phân tích hiệu năng
-*.prof
-*.perf
-perf.data
-gmon.out
-
-# Valgrind reports - Phân tích memory leaks
-valgrind-*.log
-vgcore.*
-*.memcheck
-
-# Static analysis - Phân tích mã tĩnh
-cppcheck-report.xml
-*.sarif
-
-#==============================================================================
-# PHẦN IX: DOCUMENTATION - Tài liệu tự động sinh
-#==============================================================================
-
-# Doxygen - Công cụ tạo tài liệu từ comments
-html/
-latex/
-Doxyfile.bak
-doxygen_warnings.log
-
-# Generated documentation
-docs/_build/
-docs/build/
-site/
-
-#==============================================================================
-# PHẦN X: ASSETS - Tài nguyên (chỉ ignore file lớn hoặc tạm thời)
-#==============================================================================
-
-# File PSD/XCF gốc của designers (dung lượng lớn)
-*.psd
-*.xcf
-
-# File audio chưa nén (dung lượng rất lớn)
-*.wav
-*.aif
-*.aiff
-*.flac
-
-# Video chưa render
-*.raw
-*.avi
-*.mov
-
-# File cache của assets
-.DS_Store
-Thumbs.db
-*.meta
-
-# Temporary exports
-exports/
-temp_assets/
-
-# Note: Thông thường các file đã optimize trong assets/ nên được commit
-# Chỉ ignore các file nguồn có dung lượng quá lớn
-
-#==============================================================================
-# PHẦN XI: GAME SPECIFIC - Đặc thù của game
-#==============================================================================
-
-# Save files - File lưu game của người chơi khi test
-saves/
-*.sav
-*.save
-playerdata/
-
-# Screenshots và recordings
-screenshots/
-recordings/
-*.png
-*.jpg
-*.jpeg
-# !assets/**/*.png
-# !assets/**/*.jpg
-# Comment hoặc uncomment các dòng trên tùy vào yêu cầu
-
-# Crash dumps và error reports
-crashes/
-crash_*.dmp
-error_*.txt
-
-# Performance profiling
-*.trace
-profiler_output/
-
-# Level editor temporary files
-*.tmp.txt
-*_backup.txt
-
-#==============================================================================
-# PHẦN XII: CONTINUOUS INTEGRATION - Tích hợp liên tục
-#==============================================================================
-
-# CI/CD temporary files
-.ci/
-.github/workflows/*.log
-.gitlab-ci-local/
-
-# Coverage reports
-coverage/
-.coverage
-htmlcov/
-
-# SonarQube
-.sonar/
-.scannerwork/
-
-#==============================================================================
-# PHẦN XIII: SECURITY & CREDENTIALS - Bảo mật
-#==============================================================================
-
-# API keys và credentials - QUAN TRỌNG: Không bao giờ commit!
-*.key
-*.pem
-*.cert
-*.pfx
-.env
-.env.*
-secrets.json
-credentials.json
-config.private.*
-
-# Game config files - File cấu hình game (có thể chứa settings cá nhân)
-include/Core/Config.h
-src/Core/Config.cpp
-
-# SSH keys
-id_rsa
-id_dsa
-*.ppk
-
-#==============================================================================
-# PHẦN XIV: COMPETITION HELPER - Công cụ hỗ trợ thi đấu (CPH)
-#==============================================================================
-
-# Competitive Programming Helper - Extension VS Code
-.cph/
-*.prob
-
-# Test cases temporary
-temp_test/
-test_output/
-
-#==============================================================================
-# PHẦN XV: MISCELLANEOUS - Linh tinh
-#==============================================================================
-
-# Archive files - File nén
-*.zip
-*.tar
-*.gz
-*.7z
-*.rar
-
-# SQL dumps
-*.sql
-*.sqlite
-*.db
-
-# Tags và ctags
-tags
-TAGS
-.tags
-.tags_sorted_by_file
-
-# Phát sinh từ merge conflicts
-*.orig
-*.BACKUP.*
-*.BASE.*
-*.LOCAL.*
-*.REMOTE.*
-*_BACKUP_*
-*_BASE_*
-*_LOCAL_*
-*_REMOTE_*
-
-################################################################################
-# KẾT THÚC FILE .gitignore
-# Lưu ý: Thêm exception patterns bằng cách sử dụng ! ở đầu dòng
-# Ví dụ: !important_file.txt sẽ force include file đó
-################################################################################
+# ============================================================================
+# 7. EXCEPTIONS (NGOẠI LỆ - BẮT BUỘC PHẢI GIỮ LẠI)
+# ============================================================================
+# Đảm bảo Git không bao giờ ignore file mã nguồn và tài nguyên game
+!src/
+!include/
+!assets/
+!CMakeLists.txt
+!.gitignore
+!.gitattributes

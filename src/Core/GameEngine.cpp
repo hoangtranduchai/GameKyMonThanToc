@@ -187,8 +187,6 @@ bool GameEngine::Init(const char* title, int xPos, int yPos, int width, int heig
     // Ảnh nền & UI (Quét tự động)
     AutoLoadTextures("assets/images/characters");
     AutoLoadTextures("assets/images/environment");
-    AutoLoadTextures("assets/images/ui");
-    AutoLoadTextures("assets/images/vfx");
 
     // Âm thanh
     SoundManager::GetInstance()->LoadMusic("assets/audio/bgm/bgm_menu.mp3", "bgm_menu");
