@@ -4,156 +4,155 @@
 
 using namespace std;
 
-// Khai báo hằng số cho giá trị vô cùng lớn, dùng để khởi tạo chi phí.
-const int INF = 1e9; 
+const int INF = 1e9;
 
-// Cấu trúc (struct) để đóng gói kết quả trả về một cách tường minh,
-// bao gồm tổng chi phí tối thiểu và lộ trình chi tiết.
-struct TSPSolution {
-    int cost;
-    vector<int> path;
+// Cấu trúc lưu kết quả
+struct Solution {
+    int totalSteps;
+    vector<int> pathSequence;
+    Solution() : totalSteps(INF) {}
 };
 
-class TSPSolver {
-public:
-    TSPSolution solve(const vector<vector<int>>& dist_matrix) const {
-        // Tổng số địa điểm từ kích thước của ma trận
-        // 0 là điểm xuất phát, 1 đến N là Trận Nhãn
-        const int num_points = dist_matrix.size();
+// Hàm truy vết đường đi từ bảng phương án DP
+vector<int> TracebackPath(const vector<vector<int>>& dp, 
+                          const vector<vector<int>>& parent, 
+                          int nodeCount, int finalMask, int lastNode) {
+    vector<int> path;
 
-        // Xử lý trường hợp biên: nếu không có hoặc chỉ có một điểm, chi phí là 0.
-        if (num_points <= 1) {
-            return {0, {0}};
+    // Nếu không tìm thấy đường đi hoặc node cuối không hợp lệ
+    if (lastNode == -1 || dp[finalMask][lastNode] >= INF) {
+        return path;
+    }
+
+    int currMask = finalMask;
+    int currNode = lastNode;
+
+    // Lần ngược từ trạng thái cuối về trạng thái đầu
+    while (currNode != -1) {
+        path.push_back(currNode);
+        
+        int prevNode = parent[currMask][currNode];
+        
+        // Loại bỏ bit của currNode ra khỏi mask để quay về trạng thái trước
+        int prevMask = currMask ^ (1 << currNode);
+        
+        currNode = prevNode;
+        currMask = prevMask;
+        
+        // Nếu quay về mask = 0 thì dừng (tránh vòng lặp vô tận nếu có lỗi)
+        if (currMask == 0) break;
+    }
+    
+    // Đảm bảo node xuất phát (0) có trong danh sách nếu chưa có
+    // (Logic trên thường đã bao gồm 0 ở bước cuối cùng của while, nhưng kiểm tra cho chắc chắn)
+    if (path.back() != 0) path.push_back(0);
+
+    // Đảo ngược vector để có thứ tự đúng: Xuất phát -> ... -> Đích
+    reverse(path.begin(), path.end());
+    return path;
+}
+
+void Solve() {
+    int N_Shrines;
+    // Đọc số lượng Trận Nhãn (N). Tổng số địa điểm sẽ là N + 1 (bao gồm điểm xuất phát 0)
+    if (!(cin >> N_Shrines)) return;
+
+    int numNodes = N_Shrines + 1;
+    
+    // Đọc ma trận khoảng cách
+    // dist[i][j] là chi phí từ i đến j
+    vector<vector<int>> dist(numNodes, vector<int>(numNodes));
+    for (int i = 0; i < numNodes; ++i) {
+        for (int j = 0; j < numNodes; ++j) {
+            cin >> dist[i][j];
         }
+    }
 
-        // Bảng quy hoạch động: dp[mask][i]
-        // Lưu trữ chi phí nhỏ nhất để đi qua tập các điểm trong 'mask' và kết thúc tại điểm 'i'.
-        // Kích thước: (2^num_points) x num_points.
-        // 'mask' là một số nguyên, bit thứ i của mask bật (bằng 1) nếu i đã được thăm.
-        vector<vector<int>> dp(1 << num_points, vector<int>(num_points, INF));
+    // BẮT ĐẦU THUẬT TOÁN TSP BITMASK
 
-        // Bảng truy vết: parent[mask][i]
-        // Lưu lại điểm ngay trước điểm 'i' trong lộ trình tối ưu đến trạng thái (mask, i).
-        vector<vector<int>> parent(1 << num_points, vector<int>(num_points, -1));
+    int limitMask = 1 << numNodes; // Tổng số trạng thái: 2^(N+1)
 
-        // Trường hợp cơ sở (Base Case)
-        // Bắt đầu tại điểm 0, chỉ thăm điểm 0, chi phí là 0
-        // mask = 1 (0...001) biểu thị chỉ thăm điểm 0
-        dp[1 << 0][0] = 0;
+    // dp[mask][u]: Chi phí nhỏ nhất để đi qua tập 'mask' và kết thúc tại 'u'
+    vector<vector<int>> dp(limitMask, vector<int>(numNodes, INF));
+    
+    // parent[mask][u]: Lưu node trước đó để truy vết
+    vector<vector<int>> parent(limitMask, vector<int>(numNodes, -1));
 
-        // Vòng lặp chính của DP
-        // Duyệt qua tất cả các tập con các điểm đã thăm, được biểu diễn bằng 'mask'
-        for (int mask = 1; mask < (1 << num_points); ++mask) {
-            // Với mỗi tập con, duyệt qua tất cả các điểm 'i' có thể là điểm kết thúc của lộ trình
-            for (int i = 0; i < num_points; ++i) {
-                // Kiểm tra xem điểm 'i' có thực sự nằm trong tập 'mask' hay không
-                if (mask & (1 << i)) {
-                    // Nếu trạng thái (mask, i) không thể đạt tới (chi phí vẫn là vô cùng), bỏ qua
-                    if (dp[mask][i] == INF) continue;
+    // Trạng thái cơ sở: Bắt đầu tại node 0, mask chỉ có bit 0 bật (binary: ...001)
+    dp[1][0] = 0;
 
-                    // Từ điểm 'i', thử "đẩy" (push) kết quả đến các điểm 'j' chưa được thăm
-                    for (int j = 0; j < num_points; ++j) {
-                        // Kiểm tra xem điểm 'j' đã nằm trong 'mask' chưa
-                        if (!(mask & (1 << j))) {
-                            // Nếu không có đường đi từ i đến j thì bỏ qua
-                            if (dist_matrix[i][j] == -1) continue;
+    // Duyệt qua tất cả các trạng thái mask
+    for (int mask = 1; mask < limitMask; ++mask) {
+        // Duyệt qua node cuối cùng 'u' trong tập mask hiện tại
+        for (int u = 0; u < numNodes; ++u) {
+            // Nếu u có trong mask (bit thứ u bật)
+            if ((mask & (1 << u))) {
+                
+                // Nếu trạng thái này chưa tới được (vô cực), bỏ qua
+                if (dp[mask][u] == INF) continue;
 
-                            // Tạo trạng thái mới bằng cách thêm điểm 'j' vào 'mask'
-                            int new_mask = mask | (1 << j);
-                            // Tính toán chi phí mới để đến trạng thái (new_mask, j) thông qua 'i'
-                            int new_cost = dp[mask][i] + dist_matrix[i][j];
-
-                            // Nếu chi phí mới này tốt hơn chi phí hiện tại, cập nhật lại
-                            if (new_cost < dp[new_mask][j]) {
-                                dp[new_mask][j] = new_cost;
-                                // Ghi lại truy vết: để đến được 'j' trong 'new_mask', ta đã đi từ 'i'
-                                parent[new_mask][j] = i;
+                // Thử đi tiếp đến node 'v'
+                for (int v = 0; v < numNodes; ++v) {
+                    // Nếu v chưa có trong mask (chưa thăm)
+                    if (!(mask & (1 << v))) {
+                        
+                        // Kiểm tra đường đi từ u -> v có hợp lệ không
+                        int d = dist[u][v];
+                        if (d != -1) { // -1 nghĩa là không có đường đi
+                            int nextMask = mask | (1 << v);
+                            
+                            // Tối ưu hóa (Relaxation)
+                            if (dp[nextMask][v] > dp[mask][u] + d) {
+                                dp[nextMask][v] = dp[mask][u] + d;
+                                parent[nextMask][v] = u; // Lưu vết
                             }
                         }
                     }
                 }
             }
         }
-
-        // Tìm kết quả cuối cùng
-        // Kết quả là chi phí nhỏ nhất để thăm tất cả các điểm,
-        // (mask = (1 << n) - 1, là mask có tất cả các bit đều được bật)
-        // và kết thúc ở một 'i' bất kỳ (0 <= i < n).
-        int final_mask = (1 << num_points) - 1; // Mask tất cả
-        int min_cost = INF;
-        int last_point = -1; // Lưu lại điểm kết thúc của lộ trình tối ưu.
-
-        // Lộ trình phải kết thúc ở một Trận Nhãn (từ 1 đến N)
-        // Tìm chi phí nhỏ nhất trong tất cả các khả năng kết thúc này.
-        for (int i = 1; i < num_points; ++i) {
-            if (dp[final_mask][i] < min_cost) {
-                min_cost = dp[final_mask][i];
-                last_point = i;
-            }
-        }
-
-        // Nếu không tìm thấy lộ trình (min_cost vẫn là INF), trả về -1.
-        if (min_cost == INF) {
-            return {-1, {}};
-        }
-
-        // Truy vết đường đi
-        vector<int> path;
-        int current_mask = final_mask;
-        int current_point = last_point; // Bắt đầu từ điểm kết thúc
-
-        // Đi ngược từ điểm cuối cùng về điểm xuất phát bằng cách sử dụng bảng 'parent'
-        while(current_point != -1) {
-            path.push_back(current_point);
-            
-            // Lấy điểm trước đó từ mảng parent
-            int prev_point = parent[current_mask][current_point];
-            
-            // Cập nhật mask về trạng thái trước đó (tắt bit của current_point)
-            current_mask ^= (1 << current_point);
-            
-            // Di chuyển về trước đó
-            current_point = prev_point;
-        }
-
-        // Đảo ngược vector để có được lộ trình theo đúng thứ tự từ đầu đến cuối
-        reverse(path.begin(), path.end());
-
-        // Trả về kết quả dưới dạng một đối tượng TSPSolution
-        return {min_cost, path};
     }
-};
+
+    // TÌM KẾT QUẢ TỐI ƯU
+
+    // Trạng thái đích: Mask full bit 1 (đã thăm hết tất cả các node)
+    int fullMask = limitMask - 1;
+    int minTotalSteps = INF;
+    int bestLastNode = -1;
+
+    // Điểm kết thúc có thể là bất kỳ Trận Nhãn nào (từ 1 đến N)
+    // Node 0 là điểm xuất phát, không quay lại 0 (Open TSP)
+    for (int i = 1; i < numNodes; ++i) {
+        if (dp[fullMask][i] < minTotalSteps) {
+            minTotalSteps = dp[fullMask][i];
+            bestLastNode = i;
+        }
+    }
+
+    // XUẤT KẾT QUẢ
+    
+    if (minTotalSteps == INF) {
+        cout << -1 << endl;
+    } else {
+        cout << minTotalSteps << endl;
+        
+        // Truy vết đường đi
+        vector<int> path = TracebackPath(dp, parent, numNodes, fullMask, bestLastNode);
+        
+        // In ra dãy các địa điểm
+        for (int i = 0; i < path.size(); ++i) {
+            cout << path[i] << (i == path.size() - 1 ? "" : " ");
+        }
+        cout << endl;
+    }
+}
 
 int main() {
-    ios_base::sync_with_stdio(0); cin.tie(0); cout.tie(0);
-    int N;
-    cin >> N;
-    int num_points = N + 1;
+    // Tối ưu tốc độ nhập xuất
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
 
-    // Đọc ma trận khoảng cách từ input
-    vector<vector<int>> dist_matrix(num_points, vector<int>(num_points));
-    for (int i = 0; i < num_points; ++i) {
-        for (int j = 0; j < num_points; ++j) {
-            cin >> dist_matrix[i][j];
-        }
-    }
+    Solve();
 
-    // Tạo một đối tượng của lớp TSPSolver
-    TSPSolver solver;
-    // Gọi phương thức solve để nhận về lời giải hoàn chỉnh
-    TSPSolution solution = solver.solve(dist_matrix);
-
-    // In kết quả
-    // Kiểm tra xem chi phí có phải là INF không ?
-    // Nếu vẫn là INF (1e9), nghĩa là không tìm thấy đường đi
-    if (solution.cost == INF) {
-        cout << -1 << "\n";
-    } else {
-        cout << solution.cost << "\n";
-        for (int i = 0; i < solution.path.size(); ++i) {
-            cout << solution.path[i] << (i == solution.path.size() - 1? "" : " ");
-        }
-        cout << "\n";
-    }
     return 0;
 }

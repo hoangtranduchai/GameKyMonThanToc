@@ -1,118 +1,105 @@
 #include <iostream>
 #include <vector>
-#include <string>
 #include <queue>
+#include <string>
+#include <algorithm>
 
 using namespace std;
 
+// Cấu trúc lưu tọa độ điểm trên bản đồ
 struct Point {
     int r, c;
 };
 
-class MapKnowledgeBuilder {
-    int R, C, N;
-    vector<string> grid;                // Lưu trữ bản đồ trận đồ
-    vector<Point> important_points;     // Lưu tọa độ các điểm quan trọng
+// Các biến toàn cục để lưu trữ dữ liệu bản đồ
+int R, C, N;
+vector<string> mapData;
+vector<Point> keyPoints; // Điểm quan trọng: [0] là Start, [1..N] là các Trận Nhãn
 
-    // Hàm thực thi thuật toán BFS từ một điểm nguồn (start_Point)
-    // Trả về một bản đồ khoảng cách 2D từ điểm nguồn đến mọi ô khác
-    // Hàm không thay đổi trạng thái của đối tượng nên được đánh dấu là 'const'
-    vector<vector<int>> bfs(Point start_point) const {
-        // Khởi tạo bản đồ khoảng cách, -1 nghĩa là chưa được thăm
-        vector<vector<int>> distance(R, vector<int>(C, -1));
+// Hằng số hướng di chuyển (Lên, Xuống, Trái, Phải)
+const int dr[] = {-1, 1, 0, 0};
+const int dc[] = {0, 0, -1, 1};
 
-        // Hàng đợi cho BFS, lưu trữ tọa độ {hàng, cột}
-        queue<Point> q;
+// Hàm BFS tìm khoảng cách từ một điểm xuất phát đến TOÀN BỘ bản đồ
+// Trả về mảng 2 chiều chứa khoảng cách
+vector<vector<int>> bfs_full_map(Point startNode) {
+    // Khởi tạo ma trận khoảng cách với -1 (chưa thăm)
+    vector<vector<int>> dist(R, vector<int>(C, -1));
+    queue<Point> q;
 
-        // Bắt đầu từ điểm nguồn
-        distance[start_point.r][start_point.c] = 0;
-        q.push({start_point.r, start_point.c});
+    // Setup điểm bắt đầu
+    dist[startNode.r][startNode.c] = 0;
+    q.push(startNode);
 
-        // Mảng định hướng để di chuyển 4 hướng: Phải, Trái, Xuống, Lên
-        int dr[4] = {0, 0, 1, -1};
-        int dc[4] = {1, -1, 0, 0};
+    while (!q.empty()) {
+        Point curr = q.front();
+        q.pop();
 
-        // Vòng lặp chính của BFS
-        while (!q.empty()) {
-            // Lấy ô hiện tại ra khỏi hàng đợi
-            Point current = q.front();
-            q.pop();
+        // Duyệt 4 hướng
+        for (int i = 0; i < 4; i++) {
+            int nr = curr.r + dr[i];
+            int nc = curr.c + dc[i];
 
-            // Duyệt qua 4 hàng xóm kề cạnh
-            for (int i = 0; i < 4; ++i) {
-                int nr = current.r + dr[i]; // Tọa độ hàng mới
-                int nc = current.c + dc[i]; // Tọa độ cột mới
-
-                // Kiểm tra các điều kiện hợp lệ của ô hàng xóm:
-                // 1. Nằm trong biên của bản đồ
-                // 2. Không phải là núi ('#')
-                // 3. Chưa được thăm (distance == -1)
-                if (nr >= 0 && nr < R && nc >= 0 && nc < C && grid[nr][nc]!= '#' && distance[nr][nc] == -1) {
-                    // Cập nhật khoảng cách và đưa vào hàng đợi để duyệt tiếp
-                    distance[nr][nc] = distance[current.r][current.c] + 1;
+            // Kiểm tra biên
+            if (nr >= 0 && nr < R && nc >= 0 && nc < C) {
+                // Kiểm tra ô đó có phải là núi (#) không và đã thăm chưa
+                if (mapData[nr][nc] != '#' && dist[nr][nc] == -1) {
+                    dist[nr][nc] = dist[curr.r][curr.c] + 1;
                     q.push({nr, nc});
                 }
             }
         }
-        return distance;
     }
-
-public:
-    // Constructor nhận dữ liệu bản đồ và khởi tạo các điểm quan trọng
-    MapKnowledgeBuilder(int r, int c, int n, const vector<string>& map_data)
-        : R(r), C(c), N(n), grid(map_data) {
-        
-        important_points.push_back({0, 0}); // Điểm xuất phát
-        for (int i = 0; i < R; ++i) {
-            for (int j = 0; j < C; ++j) {
-                if (grid[i][j] == 'S') {
-                    important_points.push_back({i, j});
-                }
-            }
-        }
-    }
-
-    // Phương thức thực hiện tính toán và trả về ma trận khoảng cách
-    vector<vector<int>> computeDistanceMatrix() const {
-        vector<vector<int>> dist_matrix(N + 1, vector<int>(N + 1));
-        for (int i = 0; i <= N; ++i) {
-            // Chạy BFS từ mỗi điểm quan trọng
-            vector<vector<int>> current_distances = bfs(important_points[i]);
-
-            // Trích xuất khoảng cách đến các điểm quan trọng khác
-            for (int j = 0; j <= N; ++j) {
-                dist_matrix[i][j] = current_distances[important_points[j].r][important_points[j].c];
-            }
-        }
-        return dist_matrix;
-    }
-};
+    return dist;
+}
 
 int main() {
-    ios_base::sync_with_stdio(0); cin.tie(0); cout.tie(0);
-    
-    // Đọc kích thước bản đồ và số lượng Trận Nhãn
-    int R, C, N;
+    // Tối ưu tốc độ nhập xuất
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+
+    // 1. Nhập dữ liệu
     cin >> R >> C >> N;
 
-    // Grid để lưu bản đồ
-    vector<string> grid(R);
-    for (int i = 0; i < R; ++i) {
-        cin >> grid[i];
+    mapData.resize(R);
+    // Điểm xuất phát luôn là (1,1) theo đề (tức 0,0 trong mảng)
+    keyPoints.push_back({0, 0}); 
+
+    // Nhập bản đồ và tìm vị trí các Trận Nhãn (S)
+    for (int i = 0; i < R; i++) {
+        cin >> mapData[i];
+        for (int j = 0; j < C; j++) {
+            if (mapData[i][j] == 'S') {
+                keyPoints.push_back({i, j});
+            }
+        }
     }
 
-    // Tạo một đối tượng của lớp
-    MapKnowledgeBuilder knowledge_builder(R, C, N, grid);
-    
-    // Gọi phương thức để lấy kết quả
-    vector<vector<int>> dist_matrix = knowledge_builder.computeDistanceMatrix();
+    // Tổng số điểm quan trọng (Start + N Trận Nhãn)
+    int totalNodes = N + 1; 
 
-    // In kết quả
-    for (int i = 0; i <= N; ++i) {
-        for (int j = 0; j <= N; ++j) {
-            cout << dist_matrix[i][j] << (j == N ? "" : " ");
+    // 2. Tính toán ma trận khoảng cách
+    
+    // Ma trận kết quả (N+1) x (N+1)
+    vector<vector<int>> resultMatrix(totalNodes, vector<int>(totalNodes));
+
+    for (int i = 0; i < totalNodes; i++) {
+        // Chạy BFS từ điểm i để lấy khoảng cách đến mọi nơi
+        vector<vector<int>> distMap = bfs_full_map(keyPoints[i]);
+
+        for (int j = 0; j < totalNodes; j++) {
+            Point target = keyPoints[j];
+            resultMatrix[i][j] = distMap[target.r][target.c];
+        }
+    }
+
+    // 3. In kết quả
+    for (int i = 0; i < totalNodes; i++) {
+        for (int j = 0; j < totalNodes; j++) {
+            cout << resultMatrix[i][j] << (j == totalNodes - 1 ? "" : " ");
         }
         cout << "\n";
     }
+
     return 0;
 }
