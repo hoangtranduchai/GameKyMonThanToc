@@ -2,22 +2,17 @@
 
 // THƯ VIỆN CHUẨN & SDL
 #include <SDL.h>
-#include <SDL_image.h>
-#include <SDL_ttf.h>
-#include <SDL_mixer.h>
-#include <iostream>
 #include <vector>
 #include <stack>
 #include <string>
-#include <memory>
 
 // CÁC MODULE HỆ THỐNG
 #include "Graphics/TextureManager.h"
-#include "Entities/Map.h"
 
 // Khai báo tiền (Forward Declaration) để tránh vòng lặp include
 class Player;
 class ThienCoEngine;
+class Map;
 
 // TRẠNG THÁI GAME (GAME STATES)
 enum GameState {
@@ -27,7 +22,8 @@ enum GameState {
     STATE_PLAY,             // Trạng thái chơi game
     STATE_RESULT_S,         // Màn hình kết quả thắng rank S
     STATE_RESULT_A,         // Màn hình kết quả thắng rank A
-    STATE_RESULT_LOSE       // Màn hình kết quả thua
+    STATE_RESULT_LOSE,      // Màn hình kết quả thua
+    STATE_CONTINUE          // Màn hình tiếp tục sau vòng 3 (chuyển sang vòng 4+)
 };
 
 // SNAPSHOT (DÙNG CHO TÍNH NĂNG HOÀN TÁC - UNDO)
@@ -37,6 +33,7 @@ struct GameStateMoment {
     int playerGridCol;       // Vị trí cột của nhân vật trên lười (đơn vị: ô lười)
     int currentSteps;        // Số bước đi hiện tại
     int shrinesCollected;    // Số trận nhãn đã thu thập
+    int currentLevelIdx;     // Chỉ số level hiện tại (để khôi phục đúng level khi undo)
     
     // Danh sách tọa độ các trận nhãn đã được kích hoạt tại thời điểm này
     std::vector<std::pair<int, int>> visitedShrinesSnapshot;
@@ -66,9 +63,6 @@ public:
 
     // Dọn dẹp tài nguyên trước khi thoát (Giải phóng bộ nhớ)
     void Clean();
-
-    // Thoát khỏi game
-    void Quit();
 
     // Kiểm tra game còn chạy không (để duy trì vòng lặp chính)
     bool IsRunning() const { return m_bRunning; }
@@ -140,6 +134,7 @@ private:
     int m_optimalSteps;             // Số bước tối ưu (tính bằng thuật toán AI ThienCoEngine)
     int m_shrinesCollected;         // Số trận nhãn đã thu thập
     int m_totalShrines;             // Tổng số trận nhãn trong bản đồ
+    int m_resultLevelIdx;           // Lưu level dùng để hiển thị màn hình kết quả
     std::vector<std::pair<int, int>> m_visitedShrinesList; // Danh sách tọa độ trận nhãn đã thu thập
 
     // Ngăn xếp hoàn tác cho gameplay (Lưu các bước đi)
@@ -147,6 +142,11 @@ private:
     
     // Ngăn xếp hoàn tác cho trạng thái (Lưu các màn hình đã qua)
     std::stack<GameState> m_stateHistory;
+
+    // Lưu trạng thái game trước khi rời khỏi STATE_PLAY
+    // Dùng để quay lại game khi nhấn U từ màn hình INTRO/RESULT
+    bool m_hasPreviousGameState = false;
+    GameStateMoment m_previousGameState;
 
     // QUẢN LÝ TRẠNG THÁI (STATE MANAGEMENT)
     GameState m_currentState; // Trạng thái hiện tại
@@ -169,6 +169,9 @@ private:
     
     // Biến lưu ID hình ảnh ngẫu nhiên cho các vòng sau vòng 3
     std::string m_randomRankImageID;
+
+    // Cờ chờ tăng level (dùng để tránh hiển thị sai ảnh trong quá trình fade)
+    bool m_isPendingNextLevel = false;
 
     // CÁC HÀM TRỢ GIÚP (HELPER FUNCTIONS)
     // Các hàm vẽ nội bộ

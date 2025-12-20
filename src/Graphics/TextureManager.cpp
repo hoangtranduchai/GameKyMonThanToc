@@ -1,4 +1,5 @@
 #include "Graphics/TextureManager.h"
+#include <SDL_image.h>
 #include <iostream>
 
 // Khởi tạo con trỏ Singleton là null ban đầu
@@ -116,6 +117,25 @@ void TextureManager::Draw(const std::string& id, int x, int y, int width, int he
     SDL_RenderCopy(pRenderer, m_textureMap[id], &srcRect, &destRect);
 }
 
+void TextureManager::DrawFrameScaled(const std::string& id, int x, int y, int srcWidth, int srcHeight, float scale, int currentRow, int currentFrame, SDL_Renderer* pRenderer) {
+    if (m_textureMap.find(id) == m_textureMap.end()) return;
+
+    SDL_Rect srcRect;
+    SDL_Rect destRect;
+
+    srcRect.x = srcWidth * currentFrame;
+    srcRect.y = srcHeight * currentRow;
+    srcRect.w = srcWidth;
+    srcRect.h = srcHeight;
+
+    destRect.x = x;
+    destRect.y = y;
+    destRect.w = static_cast<int>(srcWidth * scale);
+    destRect.h = static_cast<int>(srcHeight * scale);
+
+    SDL_RenderCopy(pRenderer, m_textureMap[id], &srcRect, &destRect);
+}
+
 void TextureManager::DrawFrame(const std::string& id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer) {
     // Nếu texture chưa load, thoát để tránh Crash
     if (m_textureMap.find(id) == m_textureMap.end()) return;
@@ -124,16 +144,22 @@ void TextureManager::DrawFrame(const std::string& id, int x, int y, int width, i
     SDL_Rect destRect;
 
     // XỬ LÝ CẮT SPRITESHEET (SPRITESHEET CLIPPING LOGIC)
-    // Công thức toán học để "trích xuất" đúng khung hình animation
-    // x = frame_index * frame_width
-    // y = row_index * frame_height
+    
+    // Dịch khung nhìn sang phải theo số thứ tự frame
     srcRect.x = width * currentFrame;
-    srcRect.y = height * currentRow;
-    srcRect.w = destRect.w = width;
-    srcRect.h = destRect.h = height;
 
+    // Dịch khung nhìn xuống dưới (ảnh là 1 hàng nên row = 0)
+    srcRect.y = height * currentRow;
+
+    // Kích thước ô cắt
+    srcRect.w = width;
+    srcRect.h = height;
+
+    // Vị trí vẽ
     destRect.x = x;
     destRect.y = y;
+    destRect.w = width;  // Vẽ đúng bằng kích thước 1 frame
+    destRect.h = height;
 
     SDL_RenderCopy(pRenderer, m_textureMap[id], &srcRect, &destRect);
 }

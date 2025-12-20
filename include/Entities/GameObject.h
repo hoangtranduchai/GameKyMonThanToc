@@ -2,7 +2,6 @@
 
 // THƯ VIỆN HỆ THỐNG
 #include <string>
-#include <iostream>
 #include <SDL.h>
 
 // MẪU THIẾT KẾ ĐỐI TƯỢNG THAM SỐ (PARAMETER OBJECT PATTERN)
@@ -44,10 +43,10 @@ public:
           m_width(pParams->GetWidth()), 
           m_height(pParams->GetHeight()),
           m_textureID(pParams->GetTextureID()),
-          m_numFrames(pParams->GetNumFrames()),
-          m_animSpeed(pParams->GetAnimSpeed()),
           m_currentRow(0),    // Asset dải ngang -> Luôn là hàng 0
           m_currentFrame(0),   // Frame bắt đầu
+          m_numFrames(pParams->GetNumFrames()),
+          m_animSpeed(pParams->GetAnimSpeed()),
           m_alpha(255)
     {}
     

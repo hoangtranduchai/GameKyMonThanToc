@@ -1,7 +1,6 @@
 #pragma once
 
 // --- THƯ VIỆN CẦN THIẾT ---
-#include <SDL.h>
 #include <SDL_mixer.h>
 #include <string>
 #include <map>
@@ -13,9 +12,6 @@ class SoundManager {
 public:
     // Lấy thể hiện duy nhất của SoundManager
     static SoundManager* GetInstance();
-
-    // Khởi tạo hệ thống âm thanh
-    bool Init();
     
     // Dọn dẹp hệ thống âm thanh
     void Clean();
@@ -36,8 +32,8 @@ public:
     void SetMute(bool isMuted);
 
 private:
-    SoundManager() {}
-    ~SoundManager() {}
+    SoundManager();
+    ~SoundManager();
 
     // Con trỏ thể hiện duy nhất (Singleton instance)
     static SoundManager* s_Instance;

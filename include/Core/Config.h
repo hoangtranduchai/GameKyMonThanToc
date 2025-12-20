@@ -21,6 +21,10 @@ namespace Config {
     // Chế độ toàn màn hình mặc định khi khởi động (true/false)
     static constexpr bool FULLSCREEN_ON_START = true;
 
+    // Tỷ lệ phóng kết xuất (chỉ ảnh hưởng hiển thị, không đổi logic)
+    // Ví dụ: 1.0 = nguyên gốc, 1.5 = phóng 150%, 2.0 = phóng 200%
+    static constexpr float RENDER_SCALE = 2.0f;
+
     // 2. THIẾT LẬP HIỆU SUẤT & THỜI GIAN (PERFORMANCE & TIMING)
 
     // Tốc độ khung hình mục tiêu (Frames Per Second)
@@ -35,6 +39,9 @@ namespace Config {
     // Kích thước một ô gạch (Tile Size) tính bằng pixel
     static constexpr int TILE_SIZE = 64;
 
+    // Khoảng trống phía dưới bản đồ (pixel) để chừa chỗ cho HUD/tooltip
+    static constexpr int MAP_BOTTOM_MARGIN = 36;
+
     // Kích thước nhân vật (Collision Box - Hộp va chạm)
     static constexpr int PLAYER_WIDTH = 96;
     static constexpr int PLAYER_HEIGHT = 80;
@@ -43,8 +50,8 @@ namespace Config {
 
     // Tốc độ di chuyển của nhân vật (Pixel per second - Pixel mỗi giây)
     // Giá trị này nhân với DeltaTime để ra quãng đường di chuyển
-    // 320.0f nghĩa là đi được 5 ô (5 * 64) trong 1 giây
-    static constexpr float PLAYER_SPEED = 320.0f;
+    // Điều chỉnh để vẫn ~3.5 ô/giây với TILE_SIZE mới (3.5 * 80 = 280)
+    static constexpr float PLAYER_SPEED = 280.0f;
 
     // Các định danh loại ô trên bản đồ (Tile IDs)
     // Đồng bộ với file bản đồ .txt và logic xử lý

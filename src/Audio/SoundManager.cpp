@@ -15,26 +15,6 @@ SoundManager::SoundManager() {
 
 SoundManager::~SoundManager() { Clean(); }
 
-bool SoundManager::Init() {
-    // 1. Cấu hình thiết bị âm thanh
-    // - Tần số lấy mẫu (Frequency): 44100 Hz (Chuẩn chất lượng đĩa CD)
-    // - Định dạng (Format): MIX_DEFAULT_FORMAT (16-bit signed)
-    // - Số kênh (Channels): 2 (Stereo)
-    // - Kích thước chunk: 2048 bytes (Cân bằng giữa độ trễ thấp và hiệu suất)
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        std::cerr << "[LỖI NGHIÊM TRỌNG] Không thể khởi tạo SDL_mixer! Lỗi: " << Mix_GetError() << std::endl;
-        return false;
-    }
-
-    // 2. Thiết lập âm lượng mặc định: Âm lượng tối đa
-    // Phạm vi âm lượng SDL_mixer: 0 -> 128
-    Mix_VolumeMusic(128);       // Tối đa cho nhạc nền
-    Mix_Volume(-1, 128);        // Tối đa cho tất cả kênh SFX (-1 là tất cả kênh)
-
-    std::cout << "[ÂM THANH] Khởi tạo thành công. Trạng thái: BẬT (Âm lượng tối đa)." << std::endl;
-    return true;
-}
-
 void SoundManager::Clean() {
     // 1. Giải phóng nhạc nền (BGM)
     for (auto const& [id, music] : m_musicMap) Mix_FreeMusic(music);

@@ -59,6 +59,11 @@ private:
     // Cờ đánh dấu đang di chuyển hay đứng yên
     bool m_isMoving;
 
+    // Di chuyển theo từng ô: trạng thái và đích đến
+    bool m_isMovingToTile;
+    float m_targetX;
+    float m_targetY;
+
     // Cờ đánh dấu đang trong quá trình rơi
     bool m_isFalling;
 
@@ -70,4 +75,7 @@ private:
     
     // Tọa độ lúc bắt đầu rơi
     float m_fallStartY;
+
+    // Hàm kiểm tra xem game đã thắng chưa (từ GameEngine)
+    bool IsGameWon() const;
 };

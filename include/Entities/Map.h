@@ -3,11 +3,8 @@
 // THƯ VIỆN HỆ THỐNG
 #include <string>
 #include <vector>
-#include <iostream>
-#include <fstream>
 
 // THƯ VIỆN DỰ ÁN
-#include <SDL.h>           // Cần cho SDL_Rect
 #include "Core/Config.h"   // Để lấy kích thước TILE_SIZE
 
 // STRUCT: MapPoint (TỌA ĐỘ LƯỚI)
@@ -54,6 +51,13 @@ public:
     int GetRows() const { return m_rows; }
     int GetCols() const { return m_cols; }
 
+    // Lấy offset (khoảng cách từ góc màn hình tới vị trí vẽ bản đồ)
+    int GetOffsetX() const { return m_offsetX; }
+    int GetOffsetY() const { return m_offsetY; }
+
+    // Tính tỷ lệ phóng tự động dựa trên kích thước map
+    float GetRenderScale() const;
+
 private:
     // Ma trận lưu trữ bản đồ (Vector 2 chiều)
     std::vector<std::vector<int>> m_mapMatrix;
@@ -67,4 +71,8 @@ private:
     // Kích thước bản đồ hiện tại
     int m_rows;
     int m_cols;
+
+    // Offset để căn giữa bản đồ trên màn hình
+    int m_offsetX;
+    int m_offsetY;
 };

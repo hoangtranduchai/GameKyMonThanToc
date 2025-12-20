@@ -2,11 +2,16 @@
 #include "Core/Config.h"
 #include <iostream>
 #include <stdexcept>
+#include <windows.h>
 
 const int TARGET_FPS = 60;
 const int FRAME_DELAY = 1000 / TARGET_FPS;
 
 int main(int argc, char* argv[]) {
+    // Cấu hình Console Tiếng Việt (UTF-8) để debug
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+
     std::cout << "==================================================" << std::endl;
     std::cout << "[HỆ THỐNG] Đang khởi động Game Engine KY MON THAN TOC..." << std::endl;
     std::cout << "[HỆ THỐNG] Tốc độ khung hình mục tiêu: " << TARGET_FPS << " FPS" << std::endl;

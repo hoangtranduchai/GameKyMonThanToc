@@ -4,7 +4,6 @@
 #include <string>
 #include <map>
 #include <SDL.h>
-#include <SDL_image.h>
 #include <SDL_ttf.h>
 
 // MẪU THIẾT KẾ SINGLETON
@@ -38,6 +37,9 @@ public:
 
     // Vẽ một phần của Texture (Dùng cho Animation/Spritesheet)
     void DrawFrame(const std::string& id, int x, int y, int width, int height, int currentRow, int currentFrame, SDL_Renderer* pRenderer);
+
+    // Vẽ một phần của Texture với tỷ lệ phóng (chỉ phóng kích thước vẽ, không thay đổi kích thước cắt nguồn)
+    void DrawFrameScaled(const std::string& id, int x, int y, int srcWidth, int srcHeight, float scale, int currentRow, int currentFrame, SDL_Renderer* pRenderer);
 
     // 4. Hàm truy xuất Texture (Getter)
     SDL_Texture* GetTexture(const std::string& id) { return m_textureMap[id]; }

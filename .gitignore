@@ -487,6 +487,10 @@ secrets.json
 credentials.json
 config.private.*
 
+# Game config files - File cấu hình game (có thể chứa settings cá nhân)
+include/Core/Config.h
+src/Core/Config.cpp
+
 # SSH keys
 id_rsa
 id_dsa

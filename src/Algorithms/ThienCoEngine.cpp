@@ -65,7 +65,7 @@ int ThienCoEngine::BFS_FindShortestPath(MapPoint start, MapPoint end, Map* pMap)
     int cols = pMap->GetCols();
 
     // Thay đổi kích thước hoặc đặt lại ma trận khoảng cách
-    if (dist.size() != rows || (rows > 0 && dist[0].size() != cols)) {
+    if (dist.size() != (size_t)rows || (rows > 0 && dist[0].size() != (size_t)cols)) {
         dist.assign(rows, std::vector<int>(cols, -1));
     } else {
         for (int i = 0; i < rows; i++) {
