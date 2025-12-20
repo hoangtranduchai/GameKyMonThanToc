@@ -1,241 +1,87 @@
 # Game Kỳ Môn Thần Tốc
 
-**Dự án PBL2 - Chương Trình Cấu Trúc và Lập Trình 2025-2026**
+Dự án PBL2 (CTCT & LT 2025-2026) – game phiêu lưu giải đố tile-based, xây dựng bằng C++17 + SDL2. AI nội bộ tính số bước tối ưu để đánh giá hạng (S/A) cho từng màn.
 
-Game phiêu lưu giải đố với AI tối ưu hóa đường đi (TSP Solver), được xây dựng bằng C++17 và SDL2.
-
-## Tính năng
-
-✅ **Game Engine hoàn chỉnh** với hệ thống State Machine  
-✅ **AI thông minh** - Tính toán đường đi tối ưu bằng Dynamic Programming  
-✅ **Đồ họa AAA** - Particle effects, smooth animation, parallax scrolling  
-✅ **Âm thanh đầy đủ** - Background music, sound effects  
-✅ **Hệ thống Level** - 3 màn chơi với độ khó tăng dần  
-✅ **Undo/Redo** - Hệ thống quay lại trạng thái trước đó  
-✅ **Auto-scaling** - Tự động điều chỉnh kích thước map theo màn hình  
+## Điểm nổi bật
+- State machine đầy đủ: Intro → Story (name/sensei) → Play → Result (S/A/Thua) → Continue.
+- AI Thiên Cơ: BFS tính khoảng cách, DP bitmask giải TSP để tìm số bước tối ưu cho từng bản đồ.
+- 22 level văn bản (level1.txt … level22.txt) được quét tự động trong assets/levels.
+- Hoàn tác nhiều bước (Undo) dựa trên stack trạng thái bản đồ + người chơi.
+- Tự động load texture/âm thanh theo thư mục, phóng tỷ lệ logic 1280x720, toggle fullscreen và bật/tắt âm thanh runtime.
 
 ## Yêu cầu hệ thống
-
 - Windows 10/11
-- MSYS2 với MinGW64
-- CMake 3.10+
-- SDL2, SDL2_image, SDL2_ttf, SDL2_mixer
+- MSYS2 (MinGW64) với gcc, CMake ≥ 3.10, Ninja
+- SDL2, SDL2_image, SDL2_ttf, SDL2_mixer (bản MinGW64)
 
-## Cài đặt môi trường
-
-### 1. Cài đặt MSYS2
-Tải và cài đặt từ: https://www.msys2.org/
-
-### 2. Cài đặt các thư viện cần thiết
-Mở MSYS2 terminal và chạy:
-
+## Cài đặt môi trường (MSYS2 MinGW64)
 ```bash
-# Cập nhật package database
 pacman -Syu
-
-# Cài đặt build tools
 pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja
-
-# Cài đặt SDL2
-pacman -S mingw-w64-x86_64-SDL2
-pacman -S mingw-w64-x86_64-SDL2_image
-pacman -S mingw-w64-x86_64-SDL2_ttf
-pacman -S mingw-w64-x86_64-SDL2_mixer
+pacman -S mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_image \
+           mingw-w64-x86_64-SDL2_ttf mingw-w64-x86_64-SDL2_mixer
 ```
+Thêm `C:\msys64\mingw64\bin` vào PATH để Windows tìm thấy các DLL SDL2.
 
-### 3. Thêm vào PATH
-Thêm `C:\msys64\mingw64\bin` vào System Environment Variables
+## Build và chạy
+Khuyến nghị: dùng MSYS2 MinGW64 shell hoặc VS Code cấu hình MinGW.
 
-## Build và chạy dự án
-
-### Cách 1: Sử dụng Build Script (Khuyến nghị)
-
-#### Windows Batch File (Dễ nhất)
-```cmd
-# Biên dịch dự án
-.\build.bat
-
-# Chạy game
-.\build\KyMonThanToc.exe
-```
-
-#### PowerShell Script (Nếu đã bật execution policy)
-```powershell
-# Biên dịch dự án
-.\build.ps1
-
-# Chạy game
-.\build\KyMonThanToc.exe
-```
-
-### Cách 2: Biên dịch thủ công với g++
-
-```powershell
-g++ -Iinclude -IC:\msys64\mingw64\include\SDL2 -LC:\msys64\mingw64\lib `
-    -o build\KyMonThanToc.exe `
-    src\GameEngine.cpp src\main.cpp src\Map.cpp src\ParticleSystem.cpp `
-    src\Player.cpp src\SoundManager.cpp src\TextureManager.cpp src\ThienCoEngine.cpp `
-    -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer -std=c++17
-```
-
-### Cách 3: Dùng CMake + Ninja (Nâng cao)
-
+### CMake + Ninja
 ```bash
-# Tạo thư mục build
-mkdir build
-cd build
-
-# Configure
-cmake .. -G Ninja
-
-# Build
-ninja
-
-# Chạy game
-./KyMonThanToc.exe
+cmake -G Ninja -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/KyMonThanToc.exe   # PowerShell: .\build\KyMonThanToc.exe
 ```
 
-### Cách 4: Dùng VS Code
+### Biên dịch g++ tối giản (không khuyến khích)
+```powershell
+g++ -std=c++17 -Iinclude -IC:\msys64\mingw64\include\SDL2 -LC:\msys64\mingw64\lib `
+    src\main.cpp src\Core\GameEngine.cpp src\Entities\Map.cpp src\Entities\Player.cpp `
+    src\Graphics\TextureManager.cpp src\Audio\SoundManager.cpp src\Algorithms\ThienCoEngine.cpp `
+    -o build\KyMonThanToc.exe -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer
+```
 
-1. Mở thư mục dự án trong VS Code
-2. Nhấn `Ctrl+Shift+B` để build
-3. Nhấn `F5` để chạy và debug
+> Lưu ý: chạy game từ thư mục gốc dự án để asset relative path hoạt động; nếu cần, copy các DLL SDL2* vào build/ cùng exe.
 
-## Điều khiển Game
+## Điều khiển
+- Di chuyển: W/A/S/D hoặc ↑/↓/←/→.
+- Hoàn tác: U (trong game, hoặc quay lại game nếu đang ở màn hình kết quả/intro).
+- Tiến trình cốt truyện/kết quả: Enter.
+- Reset về Intro + Level 1: 1.
+- Bật/tắt âm thanh: 2.
+- Toàn màn hình: F11.
+- Thoát game: Q.
 
-### Menu
-- `↑/↓` - Di chuyển lựa chọn
-- `Enter/Space` - Xác nhận
-- `Q` - Thoát game
-
-### Trong Game
-- `W/↑` - Di chuyển lên
-- `S/↓` - Di chuyển xuống
-- `A/←` - Di chuyển trái
-- `D/→` - Di chuyển phải
-- `U` - Undo (Quay lại bước trước)
-- `ESC` - Tạm dừng
-- `Q` - Thoát game
-
-### Màn hình Pause
-- `ESC` - Tiếp tục chơi
-- `M` - Về menu chính
-- `Q` - Thoát game
-
-### Màn hình Chiến thắng
-- `Enter/Space` - Màn tiếp theo
-- `R` - Chơi lại màn hiện tại
-- `M` - Về menu chính
+Luồng màn: Intro → Enter → Story Name → Enter → Story Sensei → Enter để vào level; sau chiến thắng Rank S chuyển level tiếp theo, Rank A hoặc thua Enter để chơi lại; sau level 3 đạt Rank S sẽ vào màn Continue trước khi chơi level 4+.
 
 ## Cấu trúc thư mục
-
 ```
-GameKyMonThanToc/
-├── assets/                    # Tài nguyên game
-│   ├── audio/                 # Âm thanh (BGM, SFX)
-│   ├── fonts/                 # Font chữ (Roboto)
-│   ├── images/                # Hình ảnh (background, tiles, clouds)
-│   │   └── player/            # Sprite sheets nhân vật
-│   └── levels/                # File level (level1.txt, level2.txt, level3.txt)
-├── include/                   # Header files (.h)
-│   ├── Config.h               # Cấu hình đường dẫn dự án
-│   ├── GameEngine.h           # Game engine chính
-│   ├── GameObject.h           # Lớp cơ sở cho game objects
-│   ├── Map.h                  # Hệ thống bản đồ
-│   ├── ParticleSystem.h       # Hệ thống particle effects
-│   ├── Player.h               # Nhân vật người chơi
-│   ├── SoundManager.h         # Quản lý âm thanh
-│   ├── TextureManager.h       # Quản lý texture/font
-│   └── ThienCoEngine.h        # AI tối ưu hóa (BFS + TSP)
-├── src/                       # Source files (.cpp)
-│   ├── GameEngine.cpp         # Triển khai game engine
-│   ├── main.cpp               # Entry point
-│   ├── Map.cpp                # Triển khai bản đồ
-│   ├── ParticleSystem.cpp     # Triển khai particle system
-│   ├── Player.cpp             # Triển khai player
-│   ├── SoundManager.cpp       # Triển khai sound manager
-│   ├── TextureManager.cpp     # Triển khai texture manager
-│   └── ThienCoEngine.cpp      # Triển khai AI (BFS + Dynamic Programming)
-├── build/                     # Thư mục build (tạo tự động)
-├── build.ps1                  # Script build PowerShell
-├── CMakeLists.txt             # File cấu hình CMake
-└── README.md                  # File hướng dẫn
+assets/            # Âm thanh, hình ảnh, font Roboto, level*.txt
+include/
+  Algorithms/ThienCoEngine.h
+  Audio/SoundManager.h
+  Core/Config.h, GameEngine.h
+  Entities/GameObject.h, Map.h, Player.h
+  Graphics/TextureManager.h
+src/
+  Algorithms/ThienCoEngine.cpp
+  Audio/SoundManager.cpp
+  Core/GameEngine.cpp
+  Entities/Map.cpp, Player.cpp
+  Graphics/TextureManager.cpp
+  main.cpp
+docs/              # Bài tập kèm theo
+build/             # Sinh bởi CMake/Ninja, auto copy assets
 ```
 
-## Kiến trúc Game
-
-### Game Engine Architecture
-- **Singleton Pattern**: GameEngine, TextureManager, SoundManager, ParticleSystem
-- **State Machine**: Menu → Play → Pause → Win
-- **Component-Based**: GameObject → Player
-- **Observer Pattern**: Event-driven (OnPlayerMove, OnShrineVisited)
-
-### AI System (ThienCoEngine)
-1. **BFS (Breadth-First Search)**: Tính khoảng cách ngắn nhất giữa các điểm
-2. **Dynamic Programming**: Giải bài toán TSP (Traveling Salesman Problem)
-   - State: `dp[mask][u]` - Chi phí nhỏ nhất để đến tập điểm `mask`, kết thúc tại `u`
-   - Complexity: O(2^N * N^2) với N là số Trận Nhãn
-3. **Traceback**: Phục hồi đường đi tối ưu từ DP table
+## AI & chấm điểm
+- Khoảng cách giữa các điểm quan trọng (xuất phát + trận nhãn) được tính bằng BFS trên lưới.
+- DP bitmask giải TSP để tìm tổng bước tối ưu; số bước người chơi được so với giá trị này để phân hạng S (≤ tối ưu) hoặc A (thắng nhưng chưa tối ưu).
 
 ## Troubleshooting
-
-### Lỗi "SDL2 not found"
-```bash
-# Kiểm tra SDL2 đã cài chưa
-pkg-config --cflags --libs sdl2
-
-# Nếu chưa có, cài lại
-pacman -S mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_image mingw-w64-x86_64-SDL2_ttf mingw-w64-x86_64-SDL2_mixer
-```
-
-### Lỗi "PROJECT_ROOT_PATH undefined"
-- Đảm bảo file `include/Config.h` tồn tại
-- Kiểm tra đường dẫn trong Config.h khớp với vị trí dự án
-
-### Lỗi biên dịch "SDL.h: No such file or directory"
-- Kiểm tra SDL2 đã cài vào đúng MinGW64:
-  ```powershell
-  Test-Path C:\msys64\mingw64\include\SDL2\SDL.h
-  ```
-- Thêm `C:\msys64\mingw64\bin` vào PATH
-
-### Game không chạy hoặc crash
-- Kiểm tra các DLL SDL2 có trong PATH
-- Copy các DLL sau vào thư mục `build\`:
-  - SDL2.dll
-  - SDL2_image.dll
-  - SDL2_ttf.dll
-  - SDL2_mixer.dll
-- Kiểm tra file assets (hình ảnh, âm thanh, level) tồn tại đầy đủ
-
-### Lỗi "Could not open file" khi chạy
-- Kiểm tra đường dẫn trong `include/Config.h` đúng chưa
-- Chạy game từ thư mục gốc của dự án (không phải từ thư mục build)
-
-## Công nghệ sử dụng
-
-- **Ngôn ngữ**: C++17
-- **Graphics**: SDL2, SDL2_image
-- **Font**: SDL2_ttf
-- **Audio**: SDL2_mixer
-- **Build System**: CMake 3.10+, Ninja
-- **Compiler**: MinGW-w64 GCC 15.2.0
-
-## Đóng góp
-
-Dự án này được phát triển cho môn PBL2 tại Đại học Bách Khoa Đà Nẵng.
-
-**Nhóm phát triển:**
-- Game Engine & Rendering System
-- AI Optimization System (BFS + TSP)
-- Asset Management & Level Design
+- `SDL.h: No such file or directory`: kiểm tra `C:\msys64\mingw64\include\SDL2\SDL.h`, PATH đã thêm `C:\msys64\mingw64\bin`.
+- Thiếu DLL khi chạy: copy SDL2.dll, SDL2_image.dll, SDL2_ttf.dll, SDL2_mixer.dll vào build/ hoặc thêm MinGW64 bin vào PATH.
+- Asset/level không tải: chắc chắn chạy exe từ thư mục gốc, assets tồn tại và giữ nguyên cấu trúc.
 
 ## License
-
-Dự án này được phát triển cho mục đích học tập tại Đại học Bách Khoa Đà Nẵng.
-
-## Tài liệu tham khảo
-
-- SDL2 Documentation: https://wiki.libsdl.org/
-- Dynamic Programming TSP: https://en.wikipedia.org/wiki/Held%E2%80%93Karp_algorithm
-- Game Programming Patterns: https://gameprogrammingpatterns.com/
+Dự án phục vụ mục đích học tập tại Đại học Bách Khoa Đà Nẵng.
