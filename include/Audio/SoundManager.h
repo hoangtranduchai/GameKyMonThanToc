@@ -1,6 +1,6 @@
 #pragma once
 
-// --- THƯ VIỆN CẦN THIẾT ---
+// THƯ VIỆN CẦN THIẾT
 #include <SDL_mixer.h>
 #include <string>
 #include <map>

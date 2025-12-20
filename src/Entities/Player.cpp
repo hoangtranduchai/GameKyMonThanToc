@@ -14,15 +14,14 @@ Player::Player(const LoaderParams* pParams)
       m_velY(0.0f),
       m_currentDir(PlayerDirection::DOWN),
       m_lastDir(PlayerDirection::DOWN),
-    m_isMoving(false),
-    m_isMovingToTile(false),
-    m_targetX(0.0f),
-    m_targetY(0.0f),
+      m_isMoving(false),
+      m_isMovingToTile(false),
+      m_targetX(0.0f),
+      m_targetY(0.0f),
       m_isFalling(false),
       m_fallTimer(0.0f),
       m_fallStartY(0.0f)
-{
-}
+{}
 
 Player::~Player() { Clean(); }
 
@@ -143,33 +142,29 @@ void Player::HandleMovement(float dt) {
         }
     }
 
-    // 2. Lấy kích thước Map hiện tại và offset
+    // Lấy kích thước Map hiện tại và offset
     Map* pMap = GameEngine::GetInstance()->GetMap();
     int mapWidth = pMap->GetCols() * Config::TILE_SIZE;
     int mapHeight = pMap->GetRows() * Config::TILE_SIZE;
     int offsetX = pMap->GetOffsetX();
     int offsetY = pMap->GetOffsetY();
 
-    // 4. KIỂM TRA BIÊN BẢN ĐỒ (MAP BOUNDARIES CHECK)
+    // KIỂM TRA BIÊN BẢN ĐỒ (MAP BOUNDARIES CHECK)
     // So sánh với vị trí của bản đồ (có tính offset)
-    // Dùng TILE_SIZE vì vị trí logic của nhân vật chiếm 1 ô gạch 64x64, không phải kích thước sprite
     bool isOutLeft   = (m_x < offsetX);
     bool isOutTop    = (m_y < offsetY);
     bool isOutRight  = (m_x + Config::TILE_SIZE > offsetX + mapWidth);
     bool isOutBottom = (m_y + Config::TILE_SIZE > offsetY + mapHeight);
 
     if (isOutLeft || isOutTop || isOutRight || isOutBottom) {
-        // Kích hoạt hiệu ứng rơi ngay lập tức
+        // Kích hoạt hiệu ứng rơi
         Falling();
         return;
     }
-
-    // 5. Nếu vẫn ở trong map: tương tác ô được xử lý khi kết thúc một bước di chuyển
 }
 
 void Player::ProcessTileInteraction() {
     // Tính toán TÂM (Center) của nhân vật
-    // Vì m_x, m_y đại diện cho vị trí ô gạch (tile position), nên center phải dựa trên TILE_SIZE
     int centerX = (int)(m_x + Config::TILE_SIZE / 2);
     int centerY = (int)(m_y + Config::TILE_SIZE / 2);
 
@@ -200,7 +195,7 @@ void Player::ProcessTileInteraction() {
 }
 
 void Player::Falling() {
-    if (m_isFalling) return; // Đã rơi rồi thì thôi
+    if (m_isFalling) return;
 
     m_isFalling = true;
     m_fallTimer = 0.0f;

@@ -400,8 +400,6 @@ void GameEngine::Update() {
                 }
                 
                 // Logic thắng: Thu thập hết Trận Nhãn
-                // Logic này bây giờ được xử lý trong OnShrineVisited() để tránh phát 2 lần sfx_win
-                // Chỉ cần xử lý delay timer ở đây
                 
                 // Logic sau khi thắng -> Chuyển sang màn kết quả
                 if (m_isWinningSequence) {
@@ -410,7 +408,7 @@ void GameEngine::Update() {
                         m_isWinningSequence = false;
 
                         // So sánh số bước đi với giải pháp AI
-                        m_resultLevelIdx = m_currentLevelIdx; // Ghìm level hiển thị kết quả
+                        m_resultLevelIdx = m_currentLevelIdx;
                         if (m_currentSteps <= m_optimalSteps) {
                             SwitchState(STATE_RESULT_S); // Hạng S - Hoàn hảo
                         } else {

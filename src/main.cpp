@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     SetConsoleCP(CP_UTF8);
 
     std::cout << "==================================================" << std::endl;
-    std::cout << "[HỆ THỐNG] Đang khởi động Game Engine KY MON THAN TOC..." << std::endl;
+    std::cout << "[HỆ THỐNG] Đang khởi động Game KY MON THAN TOC..." << std::endl;
     std::cout << "[HỆ THỐNG] Tốc độ khung hình mục tiêu: " << TARGET_FPS << " FPS" << std::endl;
     std::cout << "==================================================" << std::endl;
 
@@ -26,10 +26,10 @@ int main(int argc, char* argv[]) {
         if (!pGameEngine->Init("Ky Mon Than Toc", 
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
                               Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, true)) {
-            throw std::runtime_error("Khởi tạo Game Engine thất bại! Vui lòng kiểm tra log để biết chi tiết.");
+            throw std::runtime_error("Khởi tạo Game thất bại!");
         }
 
-        std::cout << "[HỆ THỐNG] Khởi tạo Game Engine thành công. Đang bắt đầu vòng lặp game..." << std::endl;
+        std::cout << "[HỆ THỐNG] Khởi tạo Game thành công. Đang bắt đầu vòng lặp game..." << std::endl;
 
         while (pGameEngine->IsRunning()) {
             frameStartTimestamp = SDL_GetTicks();

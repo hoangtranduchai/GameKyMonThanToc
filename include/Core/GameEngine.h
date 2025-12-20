@@ -9,7 +9,7 @@
 // CÁC MODULE HỆ THỐNG
 #include "Graphics/TextureManager.h"
 
-// Khai báo tiền (Forward Declaration) để tránh vòng lặp include
+// Forward Declaration để tránh vòng lặp include
 class Player;
 class ThienCoEngine;
 class Map;
