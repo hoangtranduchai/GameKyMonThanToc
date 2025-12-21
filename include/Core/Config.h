@@ -50,8 +50,8 @@ namespace Config {
 
     // Tốc độ di chuyển của nhân vật (Pixel per second - Pixel mỗi giây)
     // Giá trị này nhân với DeltaTime để ra quãng đường di chuyển
-    // Điều chỉnh để vẫn ~3.5 ô/giây với TILE_SIZE mới (3.5 * 80 = 280)
-    static constexpr float PLAYER_SPEED = 280.0f;
+    // Điều chỉnh để vẫn ~2.5 ô/giây với TILE_SIZE mới (2.5 * 80 = 200)
+    static constexpr float PLAYER_SPEED = 200.0f;
 
     // Các định danh loại ô trên bản đồ (Tile IDs)
     // Đồng bộ với file bản đồ .txt và logic xử lý
