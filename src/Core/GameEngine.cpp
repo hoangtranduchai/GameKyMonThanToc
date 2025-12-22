@@ -236,15 +236,13 @@ void GameEngine::LoadLevel(int levelIndex) {
 
     // 3. Tính toán đường đi tối ưu bằng AI
     // Sử dụng ThienCoEngine để giải bài toán người bán hàng (TSP)
-    std::cout << "[AI] Đang tính toán cho Cấp độ " << levelIndex + 1 << "..." << std::endl;
+    std::cout << "[AI] Đang tính toán cho Cấp độ " << levelIndex << "..." << std::endl;
     
     auto matrix = ThienCoEngine::GetInstance()->CalculateMatrix(m_pMap);
     auto solution = ThienCoEngine::GetInstance()->CalculateSolution(matrix);
     
     m_optimalSteps = solution.totalSteps;
     m_totalShrines = (int)m_pMap->GetShrines().size();
-
-    std::cout << "[AI] Số bước tối ưu: " << m_optimalSteps << std::endl;
 
     // Lưu trạng thái đầu tiên vào lịch sử hoàn tác
     SaveState();
